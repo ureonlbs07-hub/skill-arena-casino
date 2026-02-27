@@ -104,7 +104,6 @@
       box-shadow: 0 0 20px rgba(40,167,69,0.5);
     }
     
-    /* 🔥 MESA REALISTA */
     .board-container { 
       background: #1a472a;
       background-image: 
@@ -170,7 +169,7 @@
     }
     .drop-zone.hidden { display: none; }
     
-    /* 🔥 DOMINÓ COM ROTAÇÃO */
+    /* 🔥 DOMINÓ HORIZONTAL (PADRÃO) */
     .domino { 
       width: 35px; 
       height: 60px; 
@@ -209,13 +208,14 @@
         0 0 10px rgba(255,215,0,0.3);
     }
     
-    /* 🔥 ROTAÇÃO VERTICAL */
+    /* 🔥 DOMINÓ VERTICAL (DEITADO) */
     .domino.vertical { 
       width: 60px; 
       height: 35px; 
       flex-direction: row;
     }
     
+    /* 🔥 DOMINÓ HORIZONTAL (EM PÉ) */
     .domino.horizontal { 
       width: 35px; 
       height: 60px; 
@@ -250,12 +250,21 @@
       border-radius: 4px 0 0 4px; 
     }
     
+    .domino.horizontal .domino-face.top { 
+      border-bottom: 2px solid #8b7355; 
+      border-radius: 4px 4px 0 0;
+    }
+    
     .domino-face.bottom { 
       border-radius: 0 0 4px 4px;
     }
     
     .domino.vertical .domino-face.bottom { 
       border-radius: 0 4px 4px 0;
+    }
+    
+    .domino.horizontal .domino-face.bottom { 
+      border-radius: 0 0 4px 4px;
     }
     
     .pip { 
@@ -386,7 +395,7 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active')
 }
 
-// 🔥 FUNÇÃO QUE RENDERIZA PEDRA COM ROTAÇÃO
+// 🔥 RENDERIZA DOMINÓ COM ROTAÇÃO CORRETA
 function createDomino(v1, v2, rotation = 'horizontal', draggable = false) {
   const n1 = parseInt(v1), n2 = parseInt(v2)
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
@@ -675,16 +684,16 @@ function renderHand(h) {
   document.getElementById('hand').innerHTML = h.map((t, i) => createDomino(t[0], t[1], 'horizontal', true)).join('')
 }
 
-// 🔥 RENDERIZA BOARD COM ROTAÇÃO DAS PEDRAS
+// 🔥 RENDERIZA BOARD COM ROTAÇÃO
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
   document.getElementById('boardTiles').innerHTML = b.map(t => {
     if (!t) return ''
-    // 🔥 SUPORTA ARRAY [2,5] OU OBJETO {values: [2,5], rotation: 'vertical'}
     let v0, v1, rotation = 'horizontal'
     if (Array.isArray(t)) {
       v0 = t[0]
       v1 = t[1]
+      rotation = 'horizontal'
     } else if (t.values) {
       v0 = t.values[0]
       v1 = t.values[1]

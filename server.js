@@ -29,7 +29,6 @@ function generateDeck() {
   return deck.sort(() => Math.random() - 0.5)
 }
 
-// 🔥 FUNÇÃO PARA ENVIAR LISTA DE SALAS A TODOS
 function sendRoomList() {
   const list = Object.values(rooms).map(r => ({
     code: r.code,
@@ -42,13 +41,12 @@ function sendRoomList() {
 
 io.on("connection", (socket) => {
   console.log("🔌 Conectado:", socket.id)
-  
-  // 🔥 ENVIA LISTA DE SALAS AO CONECTAR
   sendRoomList()
 
   socket.on("register", (username) => {
     users[socket.id] = { username }
     socket.emit("registered", { id: socket.id, username })
+    console.log("✅ Usuário registrado:", username)
   })
 
   socket.on("createRoom", () => {
@@ -61,19 +59,22 @@ io.on("connection", (socket) => {
       hands: {},
       deck: [],
       turn: null,
-      started: false,
-      direction: 'right'
+      started: false
     }
-    console.log("🏠 Sala criada:", code)
+    console.log("🏠 Sala criada:", code, "Host:", socket.id)
     socket.emit("roomCreated", { code })
-    
-    // 🔥 ATUALIZA LISTA DE SALAS PARA TODOS
     sendRoomList()
   })
 
   socket.on("joinRoom", (code) => {
     const room = rooms[code]
-    if (!room) return socket.emit("error", { message: "Sala não existe" })
+    console.log("🚪 Tentando entrar na sala:", code)
+    console.log("📋 Salas existentes:", Object.keys(rooms))
+    
+    if (!room) {
+      console.log("❌ Sala não encontrada:", code)
+      return socket.emit("error", { message: "Sala não existe" })
+    }
     if (room.started) return socket.emit("error", { message: "Jogo já começou" })
     if (room.guest) return socket.emit("error", { message: "Sala cheia" })
     if (room.host === socket.id) return socket.emit("error", { message: "Você é o host!" })
@@ -83,14 +84,20 @@ io.on("connection", (socket) => {
 
     io.to(room.host).emit("guestJoined", { code })
     socket.emit("roomJoined", { code })
-    
-    // 🔥 ATUALIZA LISTA DE SALAS PARA TODOS
     sendRoomList()
   })
 
   socket.on("startGame", (code) => {
     const room = rooms[code]
-    if (!room || room.host !== socket.id || !room.guest) return
+    console.log("🚀 Iniciando jogo na sala:", code)
+    
+    if (!room) {
+      console.log("❌ Sala não encontrada:", code)
+      return socket.emit("error", { message: "Sala não encontrada" })
+    }
+    if (room.host !== socket.id) return socket.emit("error", { message: "Apenas host pode iniciar" })
+    if (!room.guest) return socket.emit("error", { message: "Aguarde o convidado entrar" })
+    if (room.started) return
 
     room.started = true
     const deck = generateDeck()
@@ -101,9 +108,8 @@ io.on("connection", (socket) => {
     }
     room.board = []
     room.turn = room.host
-    room.direction = 'right'
 
-    console.log("🎮 Jogo iniciado!")
+    console.log("🎮 Jogo iniciado!", code)
 
     io.to(room.host).emit("gameStart", {
       hand: room.hands[room.host],
@@ -120,54 +126,71 @@ io.on("connection", (socket) => {
 
   socket.on("play", ({ code, tile, side }) => {
     const room = rooms[code]
-    if (!room) return socket.emit("error", { message: "Sala não encontrada" })
+    console.log("🎲 Jogada recebida - Sala:", code, "Pedra:", tile, "Lado:", side)
+    
+    if (!room) {
+      console.log("❌ Sala não encontrada:", code)
+      return socket.emit("error", { message: "Sala não encontrada" })
+    }
     if (room.turn !== socket.id) return socket.emit("error", { message: "Não é sua vez!" })
 
     const hand = room.hands[socket.id]
+    if (!hand) return socket.emit("error", { message: "Mão não encontrada" })
+
     const t0 = parseInt(tile[0])
     const t1 = parseInt(tile[1])
 
     const idx = hand.findIndex(t => parseInt(t[0]) === t0 && parseInt(t[1]) === t1)
     if (idx === -1) return socket.emit("error", { message: "Pedra não encontrada!" })
 
-    let pieceData = {
-      values: [t0, t1],
-      rotation: 'horizontal'
-    }
-
+    // 🔥 PRIMEIRA PEDRA - HORIZONTAL
     if (room.board.length === 0) {
-      room.board.push(pieceData)
-      room.direction = 'right'
+      room.board.push({
+        values: [t0, t1],
+        rotation: 'horizontal'
+      })
+      console.log("✅ Primeira pedra (horizontal):", [t0, t1])
     } else {
       const left = room.board[0].values[0]
       const right = room.board[room.board.length - 1].values[1]
       let played = false
 
+      // 🔥 ROTAÇÃO: VERTICAL A CADA 5 PEDRAS PARA FAZER A CURVA
+      const shouldRotate = room.board.length > 0 && room.board.length % 5 === 0
+
       if (side === "left") {
         if (t1 === left) {
-          pieceData.values = [t0, t1]
-          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
-          room.board.unshift(pieceData)
+          room.board.unshift({
+            values: [t0, t1],
+            rotation: shouldRotate ? 'vertical' : 'horizontal'
+          })
           played = true
+          console.log("✅ Esquerda:", [t0, t1], "Rotação:", shouldRotate ? 'vertical' : 'horizontal')
         } else if (t0 === left) {
-          pieceData.values = [t1, t0]
-          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
-          room.board.unshift(pieceData)
+          room.board.unshift({
+            values: [t1, t0],
+            rotation: shouldRotate ? 'vertical' : 'horizontal'
+          })
           played = true
+          console.log("✅ Esquerda (invertida):", [t1, t0], "Rotação:", shouldRotate ? 'vertical' : 'horizontal')
         }
       }
 
       if (side === "right" && !played) {
         if (t0 === right) {
-          pieceData.values = [t0, t1]
-          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
-          room.board.push(pieceData)
+          room.board.push({
+            values: [t0, t1],
+            rotation: shouldRotate ? 'vertical' : 'horizontal'
+          })
           played = true
+          console.log("✅ Direita:", [t0, t1], "Rotação:", shouldRotate ? 'vertical' : 'horizontal')
         } else if (t1 === right) {
-          pieceData.values = [t1, t0]
-          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
-          room.board.push(pieceData)
+          room.board.push({
+            values: [t1, t0],
+            rotation: shouldRotate ? 'vertical' : 'horizontal'
+          })
           played = true
+          console.log("✅ Direita (invertida):", [t1, t0], "Rotação:", shouldRotate ? 'vertical' : 'horizontal')
         }
       }
 
@@ -178,7 +201,7 @@ io.on("connection", (socket) => {
     console.log("✅ Pedra jogada. Restam:", hand.length)
 
     if (hand.length === 0) {
-      console.log("🏆 Vencedor!")
+      console.log("🏆 Vencedor:", socket.id)
       io.emit("gameOver", { winner: socket.id })
       delete rooms[code]
       sendRoomList()
@@ -186,6 +209,7 @@ io.on("connection", (socket) => {
     }
 
     room.turn = room.turn === room.host ? room.guest : room.host
+    console.log("🔄 Vez passada para:", room.turn)
 
     socket.emit("tilePlayed", {
       hand: room.hands[socket.id],
@@ -199,7 +223,9 @@ io.on("connection", (socket) => {
 
   socket.on("buyTile", ({ code }) => {
     const room = rooms[code]
-    if (!room || room.turn !== socket.id || room.deck.length === 0) return
+    if (!room) return socket.emit("error", { message: "Sala não encontrada" })
+    if (room.turn !== socket.id) return socket.emit("error", { message: "Não é sua vez!" })
+    if (room.deck.length === 0) return socket.emit("error", { message: "Monte vazio!" })
 
     room.hands[socket.id].push(room.deck.pop())
     console.log("🛒 Pedra comprada")
@@ -212,8 +238,10 @@ io.on("connection", (socket) => {
   })
 
   socket.on("disconnect", () => {
+    console.log("❌ Disconnect:", socket.id)
     for (const code in rooms) {
       if (rooms[code].host === socket.id || rooms[code].guest === socket.id) {
+        console.log("🗑️ Deletando sala:", code)
         delete rooms[code]
       }
     }

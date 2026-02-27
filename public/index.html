@@ -8,7 +8,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
       font-family: sans-serif; 
-      background: #1a472a; 
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       color: white; 
       padding: 5px;
       min-height: 100vh;
@@ -23,8 +23,9 @@
       padding: 15px; 
       max-width: 400px; 
       margin: 20px auto; 
+      border: 2px solid rgba(255,215,0,0.3);
     }
-    h1 { text-align: center; color: #ffd700; margin-bottom: 15px; font-size: 1.5em; }
+    h1 { text-align: center; color: #ffd700; margin-bottom: 15px; font-size: 1.5em; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
     input { 
       width: 100%; 
       padding: 12px; 
@@ -45,10 +46,10 @@
       cursor: pointer;
       font-size: 16px;
     }
-    .btn-green { background: #28a745; color: white; }
-    .btn-blue { background: #007bff; color: white; }
-    .btn-red { background: #dc3545; color: white; font-size: 18px; }
-    .btn-yellow { background: #ffc107; color: black; }
+    .btn-green { background: linear-gradient(135deg, #28a745, #1e7e34); color: white; }
+    .btn-blue { background: linear-gradient(135deg, #007bff, #0056b3); color: white; }
+    .btn-red { background: linear-gradient(135deg, #dc3545, #c82333); color: white; font-size: 18px; }
+    .btn-yellow { background: linear-gradient(135deg, #ffc107, #ff9800); color: black; }
     .hidden { display: none; }
     #rooms { list-style: none; }
     #rooms li { 
@@ -71,11 +72,12 @@
       margin-bottom: 10px;
       flex-wrap: wrap;
       gap: 8px;
+      border: 1px solid rgba(255,215,0,0.2);
     }
     .deck-pile { 
       width: 45px; 
       height: 65px; 
-      background: #2d5a3d; 
+      background: linear-gradient(135deg, #2d5a3d, #1a472a);
       border: 3px dashed #ffd700; 
       border-radius: 8px; 
       display: flex; 
@@ -85,6 +87,7 @@
       font-weight: bold; 
       cursor: pointer;
       font-size: 16px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.5);
     }
     
     #turn { 
@@ -94,53 +97,85 @@
       border-radius: 10px; 
       margin: 10px 0; 
       font-weight: bold;
+      border: 1px solid rgba(255,215,0,0.2);
     }
-    #turn.active { background: #28a745; }
+    #turn.active { 
+      background: linear-gradient(135deg, #28a745, #1e7e34);
+      box-shadow: 0 0 20px rgba(40,167,69,0.5);
+    }
     
-    /* 🔥 MESA COMPACTA COM SCROLL */
+    /* 🔥 MESA REALISTA */
     .board-container { 
-      background: #1a472a; 
-      border: 4px solid #3d2817; 
-      border-radius: 10px; 
-      padding: 8px; 
-      margin: 8px 0; 
+      background: #1a472a;
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0%, transparent 70%),
+        repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 2px, transparent 2px, transparent 10px);
+      border: 8px solid #3d2817;
+      border-radius: 15px;
+      padding: 15px; 
+      margin: 10px 0; 
       overflow-x: auto;
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       width: 100%;
+      box-shadow: 
+        inset 0 0 50px rgba(0,0,0,0.6),
+        0 5px 20px rgba(0,0,0,0.5),
+        0 0 0 2px rgba(255,215,0,0.1);
+      position: relative;
     }
+    
+    .board-title {
+      text-align: center;
+      color: #ffd700;
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px rgba(255,215,0,0.5);
+      letter-spacing: 2px;
+    }
+    
     .board { 
       display: flex; 
+      flex-wrap: wrap;
       align-items: center;
-      gap: 3px; 
-      min-height: 70px; 
-      padding: 8px;
+      justify-content: center;
+      gap: 4px; 
+      min-height: 100px; 
+      padding: 15px;
       min-width: max-content;
+      background: rgba(0,0,0,0.1);
+      border-radius: 10px;
     }
     
     .drop-zone { 
-      width: 32px; 
-      height: 55px; 
-      border: 2px dashed #ffd700; 
+      width: 35px; 
+      height: 60px; 
+      border: 2px dashed rgba(255,215,0,0.6); 
       border-radius: 6px; 
       display: flex; 
       align-items: center; 
       justify-content: center; 
-      color: #ffd700; 
+      color: rgba(255,215,0,0.8); 
       cursor: pointer; 
       flex-shrink: 0;
-      font-size: 9px;
-      background: rgba(255,215,0,0.1);
+      font-size: 10px;
+      background: rgba(255,215,0,0.05);
+      transition: all 0.3s;
     }
-    .drop-zone:hover { background: rgba(255,215,0,0.2); }
+    .drop-zone:hover { 
+      background: rgba(255,215,0,0.2); 
+      border-color: #ffd700;
+      transform: scale(1.05);
+    }
     .drop-zone.hidden { display: none; }
     
-    /* 🔥 DOMINÓ COMPACTO PARA MOBILE */
+    /* 🔥 DOMINÓ COM ROTAÇÃO */
     .domino { 
-      width: 32px; 
-      height: 55px; 
-      background: #f5f5dc; 
-      border-radius: 5px; 
+      width: 35px; 
+      height: 60px; 
+      background: linear-gradient(145deg, #fef9e7 0%, #f5f5dc 40%, #e8e8c8 100%);
+      border-radius: 6px; 
       display: flex; 
       flex-direction: column; 
       cursor: grab; 
@@ -148,20 +183,50 @@
       flex-shrink: 0;
       touch-action: none;
       user-select: none;
+      box-shadow: 
+        2px 2px 6px rgba(0,0,0,0.4),
+        inset 0 0 10px rgba(0,0,0,0.05),
+        0 0 0 1px rgba(255,255,255,0.3);
+      position: relative;
+      transition: all 0.2s;
     }
+    
+    .domino::before {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px; right: 3px; bottom: 3px;
+      border: 1px solid rgba(139,115,85,0.3);
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    
     .domino:hover { 
-      transform: translateY(-2px); 
+      transform: translateY(-3px); 
       border-color: #ffd700;
+      box-shadow: 
+        2px 5px 15px rgba(0,0,0,0.5),
+        0 0 0 1px rgba(255,215,0,0.5),
+        0 0 10px rgba(255,215,0,0.3);
     }
+    
+    /* 🔥 ROTAÇÃO VERTICAL */
+    .domino.vertical { 
+      width: 60px; 
+      height: 35px; 
+      flex-direction: row;
+    }
+    
     .domino.horizontal { 
-      width: 55px; 
-      height: 32px; 
-      flex-direction: row; 
+      width: 35px; 
+      height: 60px; 
+      flex-direction: column;
     }
+    
     .domino.dragging { 
-      opacity: 0.6; 
-      transform: scale(1.1);
+      opacity: 0.8; 
+      transform: scale(1.15) rotate(3deg);
       z-index: 1000;
+      cursor: grabbing;
     }
     
     .domino-face { 
@@ -169,23 +234,39 @@
       display: grid; 
       grid-template-columns: repeat(3, 1fr); 
       grid-template-rows: repeat(3, 1fr); 
-      padding: 2px; 
-      gap: 1px; 
+      padding: 3px; 
+      gap: 2px; 
+      position: relative;
     }
-    .domino-face.top { border-bottom: 1px solid #8b7355; }
-    .domino.horizontal .domino-face.top { 
+    
+    .domino-face.top { 
+      border-bottom: 2px solid #8b7355; 
+      border-radius: 4px 4px 0 0;
+    }
+    
+    .domino.vertical .domino-face.top { 
       border-bottom: none; 
-      border-right: 1px solid #8b7355; 
+      border-right: 2px solid #8b7355; 
+      border-radius: 4px 0 0 4px; 
+    }
+    
+    .domino-face.bottom { 
+      border-radius: 0 0 4px 4px;
+    }
+    
+    .domino.vertical .domino-face.bottom { 
+      border-radius: 0 4px 4px 0;
     }
     
     .pip { 
-      background: #000; 
+      background: radial-gradient(circle at 35% 35%, #2a2a2a 0%, #000 100%);
       border-radius: 50%; 
-      width: 4px; 
-      height: 4px; 
+      width: 5px; 
+      height: 5px; 
       justify-self: center; 
       align-self: center; 
-      display: none; 
+      display: none;
+      box-shadow: inset 0 0 2px rgba(255,255,255,0.3);
     }
     .v0 .pip { display: none; }
     .v1 .p5 { display: block; }
@@ -218,32 +299,28 @@
       font-size: 13px;
     }
 
-    /* 🔥 TABLET (600px - 1023px) */
     @media (min-width: 600px) {
       body { padding: 10px; }
       .card { padding: 20px; max-width: 500px; }
       h1 { font-size: 2em; }
-      .domino { width: 40px; height: 68px; }
-      .domino.horizontal { width: 68px; height: 40px; }
-      .pip { width: 5px; height: 5px; }
+      .domino.horizontal { width: 40px; height: 68px; }
+      .domino.vertical { width: 68px; height: 40px; }
+      .pip { width: 6px; height: 6px; }
       .deck-pile { width: 55px; height: 75px; }
       .drop-zone { width: 40px; height: 68px; }
-      .board-container { min-height: 100px; padding: 12px; }
-      .board { min-height: 85px; gap: 4px; }
+      .board-container { min-height: 120px; padding: 20px; }
     }
 
-    /* 🔥 DESKTOP (1024px+) */
     @media (min-width: 1024px) {
       body { padding: 20px; }
       .card { padding: 30px; max-width: 600px; }
       h1 { font-size: 2.5em; }
-      .domino { width: 48px; height: 82px; }
-      .domino.horizontal { width: 82px; height: 48px; }
+      .domino.horizontal { width: 48px; height: 82px; }
+      .domino.vertical { width: 82px; height: 48px; }
       .pip { width: 7px; height: 7px; }
       .deck-pile { width: 65px; height: 90px; }
       .drop-zone { width: 48px; height: 82px; }
-      .board-container { min-height: 130px; padding: 20px; }
-      .board { min-height: 100px; gap: 5px; }
+      .board-container { min-height: 150px; }
     }
   </style>
 </head>
@@ -287,10 +364,10 @@
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
   <div class="board-container">
-    <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;font-size:14px;">📌 Mesa</h3>
+    <div class="board-title">📌 MESA</div>
     <div class="board">
       <div class="drop-zone hidden" id="dropLeft" ondragover="allowDrop(event)" ondrop="drop(event,'left')">⬅️</div>
-      <div id="boardTiles" style="display:flex;gap:3px;align-items:center;"></div>
+      <div id="boardTiles" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;"></div>
       <div class="drop-zone hidden" id="dropRight" ondragover="allowDrop(event)" ondrop="drop(event,'right')">➡️</div>
       <div class="drop-zone hidden" id="dropCenter" ondragover="allowDrop(event)" ondrop="drop(event,'center')">🎲</div>
     </div>
@@ -309,13 +386,14 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active')
 }
 
-function createDomino(v1, v2, horizontal = false, draggable = false) {
+// 🔥 FUNÇÃO QUE RENDERIZA PEDRA COM ROTAÇÃO
+function createDomino(v1, v2, rotation = 'horizontal', draggable = false) {
   const n1 = parseInt(v1), n2 = parseInt(v2)
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
   const f1 = '<div class="domino-face top v' + n1 + '">' + pips + '</div>'
   const f2 = '<div class="domino-face bottom v' + n2 + '">' + pips + '</div>'
   const attrs = (draggable ? 'draggable="true" ondragstart="handleDrag(event)" ontouchstart="handleTouchStart(event)" ontouchmove="handleTouchMove(event)" ontouchend="handleTouchEnd(event)"' : '') + ' data-v1="' + n1 + '" data-v2="' + n2 + '"'
-  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ' + attrs + '>' + f1 + f2 + '</div>'
+  return '<div class="domino ' + rotation + '" ' + attrs + '>' + f1 + f2 + '</div>'
 }
 
 function handleDrag(e) {
@@ -343,8 +421,8 @@ function handleTouchStart(e) {
   touchStartY = touch.clientY
   target.classList.add('dragging')
   target.style.position = 'fixed'
-  target.style.left = (touch.clientX - 16) + 'px'
-  target.style.top = (touch.clientY - 28) + 'px'
+  target.style.left = (touch.clientX - 18) + 'px'
+  target.style.top = (touch.clientY - 30) + 'px'
   target.style.zIndex = '1000'
 }
 
@@ -352,8 +430,8 @@ function handleTouchMove(e) {
   if (!draggedElement) return
   e.preventDefault()
   const touch = e.touches[0]
-  draggedElement.style.left = (touch.clientX - 16) + 'px'
-  draggedElement.style.top = (touch.clientY - 28) + 'px'
+  draggedElement.style.left = (touch.clientX - 18) + 'px'
+  draggedElement.style.top = (touch.clientY - 30) + 'px'
 }
 
 function handleTouchEnd(e) {
@@ -514,8 +592,8 @@ function getBoardEnds(board) {
   if (!board || board.length === 0) return { left: null, right: null }
   const first = board[0]
   const last = board[board.length - 1]
-  const left = Array.isArray(first) ? parseInt(first[0]) : null
-  const right = Array.isArray(last) ? parseInt(last[1]) : null
+  const left = Array.isArray(first) ? first[0] : (first.values ? first.values[0] : null)
+  const right = Array.isArray(last) ? last[1] : (last.values ? last.values[1] : null)
   return { left, right }
 }
 
@@ -594,14 +672,27 @@ function passTurn() {
 
 function renderHand(h) {
   if (!h || !Array.isArray(h)) return
-  document.getElementById('hand').innerHTML = h.map((t, i) => createDomino(t[0], t[1], false, true)).join('')
+  document.getElementById('hand').innerHTML = h.map((t, i) => createDomino(t[0], t[1], 'horizontal', true)).join('')
 }
 
+// 🔥 RENDERIZA BOARD COM ROTAÇÃO DAS PEDRAS
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
   document.getElementById('boardTiles').innerHTML = b.map(t => {
-    if (!t || !Array.isArray(t) || t.length !== 2) return ''
-    return createDomino(t[0], t[1], true)
+    if (!t) return ''
+    // 🔥 SUPORTA ARRAY [2,5] OU OBJETO {values: [2,5], rotation: 'vertical'}
+    let v0, v1, rotation = 'horizontal'
+    if (Array.isArray(t)) {
+      v0 = t[0]
+      v1 = t[1]
+    } else if (t.values) {
+      v0 = t.values[0]
+      v1 = t.values[1]
+      rotation = t.rotation || 'horizontal'
+    } else {
+      return ''
+    }
+    return createDomino(v0, v1, rotation)
   }).join('')
 }
 

@@ -10,14 +10,7 @@ app.use(express.json())
 app.use(express.static("public"))
 
 const server = http.createServer(app)
-
-// ✅ CORS ADICIONADO (necessário para produção)
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-})
+const io = new Server(server)
 
 let rooms = {}
 let users = {}
@@ -36,19 +29,8 @@ function generateDeck() {
   return deck.sort(() => Math.random() - 0.5)
 }
 
-function sendRoomList() {
-  const list = Object.values(rooms).map(r => ({
-    code: r.code,
-    players: (r.host ? 1 : 0) + (r.guest ? 1 : 0),
-    started: r.started,
-    hostId: r.host
-  }))
-  io.emit("roomList", list)
-}
-
 io.on("connection", (socket) => {
   console.log("🔌 Conectado:", socket.id)
-  sendRoomList()
 
   socket.on("register", (username) => {
     users[socket.id] = { username }
@@ -65,36 +47,29 @@ io.on("connection", (socket) => {
       hands: {},
       deck: [],
       turn: null,
-      started: false
+      started: false,
+      direction: 'right' // 🔥 DIREÇÃO ATUAL DO JOGO
     }
-    console.log("🏠 Sala criada:", code, "Host:", socket.id)
+    console.log("🏠 Sala criada:", code)
     socket.emit("roomCreated", { code })
-    sendRoomList()
   })
 
   socket.on("joinRoom", (code) => {
     const room = rooms[code]
     if (!room) return socket.emit("error", { message: "Sala não existe" })
-    if (room.started) return socket.emit("error", { message: "Jogo já começou" })
     if (room.guest) return socket.emit("error", { message: "Sala cheia" })
-    if (room.host === socket.id) {
-      return socket.emit("error", { message: "Você já é o host desta sala!" })
-    }
+    if (room.host === socket.id) return socket.emit("error", { message: "Você é o host!" })
 
     room.guest = socket.id
-    console.log("👤 Guest entrou:", socket.id, "Sala:", code)
+    console.log("👤 Guest entrou:", code)
 
-    io.to(room.host).emit("guestJoined", { code, guestId: socket.id })
+    io.to(room.host).emit("guestJoined", { code })
     socket.emit("roomJoined", { code })
-    sendRoomList()
   })
 
   socket.on("startGame", (code) => {
     const room = rooms[code]
-    if (!room) return
-    if (room.host !== socket.id) return socket.emit("error", { message: "Apenas host pode iniciar" })
-    if (!room.guest) return socket.emit("error", { message: "Aguarde o convidado entrar" })
-    if (room.started) return
+    if (!room || room.host !== socket.id || !room.guest) return
 
     room.started = true
     const deck = generateDeck()
@@ -105,85 +80,91 @@ io.on("connection", (socket) => {
     }
     room.board = []
     room.turn = room.host
+    room.direction = 'right'
 
     console.log("🎮 Jogo iniciado!")
 
     io.to(room.host).emit("gameStart", {
       hand: room.hands[room.host],
-      isHost: true,
-      deckCount: room.deck.length,
-      opponent: users[room.guest]?.username || "Oponente"
+      deckCount: room.deck.length
     })
 
     io.to(room.guest).emit("gameStart", {
       hand: room.hands[room.guest],
-      isHost: false,
-      deckCount: room.deck.length,
-      opponent: users[room.host]?.username || "Oponente"
-    })
-
-    io.emit("update", {
-      board: [],
-      turn: room.turn,
       deckCount: room.deck.length
     })
+
+    io.emit("update", { board: [], turn: room.turn, deckCount: room.deck.length })
   })
 
+  // 🔥 LÓGICA DE ROTAÇÃO DAS PEDRAS
   socket.on("play", ({ code, tile, side }) => {
     const room = rooms[code]
     if (!room) return socket.emit("error", { message: "Sala não encontrada" })
     if (room.turn !== socket.id) return socket.emit("error", { message: "Não é sua vez!" })
 
     const hand = room.hands[socket.id]
-    if (!hand) return socket.emit("error", { message: "Mão não encontrada" })
+    const t0 = parseInt(tile[0])
+    const t1 = parseInt(tile[1])
 
-    const tile0 = Number(tile[0])
-    const tile1 = Number(tile[1])
+    const idx = hand.findIndex(t => parseInt(t[0]) === t0 && parseInt(t[1]) === t1)
+    if (idx === -1) return socket.emit("error", { message: "Pedra não encontrada!" })
 
-    const tileIndex = hand.findIndex(t => Number(t[0]) === tile0 && Number(t[1]) === tile1)
-
-    if (tileIndex === -1) {
-      return socket.emit("error", { message: "Você não tem esta pedra!" })
+    let pieceData = {
+      values: [t0, t1],
+      rotation: 'horizontal' // 🔥 ROTAÇÃO: 'horizontal' ou 'vertical'
     }
 
     if (room.board.length === 0) {
-      room.board.push([tile0, tile1])
+      // 🔥 PRIMEIRA PEDRA - HORIZONTAL
+      room.board.push(pieceData)
+      room.direction = 'right'
     } else {
-      const left = room.board[0][0]
-      const right = room.board[room.board.length - 1][1]
+      const left = room.board[0].values[0]
+      const right = room.board[room.board.length - 1].values[1]
       let played = false
 
+      // 🔥 JOGAR NA ESQUERDA
       if (side === "left") {
-        if (tile1 === left) {
-          room.board.unshift([tile0, tile1])
+        if (t1 === left) {
+          pieceData.values = [t0, t1]
+          // 🔥 VERTICAL SE MUDAR DIREÇÃO
+          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          room.board.unshift(pieceData)
           played = true
-        } else if (tile0 === left) {
-          room.board.unshift([tile1, tile0])
+        } else if (t0 === left) {
+          pieceData.values = [t1, t0]
+          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          room.board.unshift(pieceData)
           played = true
         }
       }
 
+      // 🔥 JOGAR NA DIREITA
       if (side === "right" && !played) {
-        if (tile0 === right) {
-          room.board.push([tile0, tile1])
+        if (t0 === right) {
+          pieceData.values = [t0, t1]
+          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          room.board.push(pieceData)
           played = true
-        } else if (tile1 === right) {
-          room.board.push([tile1, tile0])
+        } else if (t1 === right) {
+          pieceData.values = [t1, t0]
+          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          room.board.push(pieceData)
           played = true
         }
       }
 
-      if (!played) {
-        return socket.emit("error", { message: "Não encaixa! Tente o outro lado." })
-      }
+      if (!played) return socket.emit("error", { message: "Não encaixa!" })
     }
 
-    hand.splice(tileIndex, 1)
+    hand.splice(idx, 1)
+    console.log("✅ Pedra jogada. Restam:", hand.length)
 
     if (hand.length === 0) {
+      console.log("🏆 Vencedor!")
       io.emit("gameOver", { winner: socket.id })
       delete rooms[code]
-      sendRoomList()
       return
     }
 
@@ -196,21 +177,15 @@ io.on("connection", (socket) => {
       deckCount: room.deck.length
     })
 
-    io.emit("update", {
-      board: room.board,
-      turn: room.turn,
-      deckCount: room.deck.length
-    })
+    io.emit("update", { board: room.board, turn: room.turn, deckCount: room.deck.length })
   })
 
   socket.on("buyTile", ({ code }) => {
     const room = rooms[code]
-    if (!room) return socket.emit("error", { message: "Sala não encontrada" })
-    if (room.turn !== socket.id) return socket.emit("error", { message: "Não é sua vez!" })
-    if (room.deck.length === 0) return socket.emit("error", { message: "Monte vazio!" })
+    if (!room || room.turn !== socket.id || room.deck.length === 0) return
 
-    const tile = room.deck.pop()
-    room.hands[socket.id].push(tile)
+    room.hands[socket.id].push(room.deck.pop())
+    console.log("🛒 Pedra comprada")
 
     socket.emit("tileBought", {
       hand: room.hands[socket.id],
@@ -225,13 +200,10 @@ io.on("connection", (socket) => {
         delete rooms[code]
       }
     }
-    sendRoomList()
   })
 })
 
-// ✅ PORTA CORRIGIDA PARA RAILWAY
 const PORT = process.env.PORT || 3000
-
-server.listen(PORT, () => {
-  console.log("🚀 Servidor rodando na porta", PORT)
+server.listen(PORT, '0.0.0.0', () => {
+  console.log("🚀 Servidor rodando na porta " + PORT)
 })

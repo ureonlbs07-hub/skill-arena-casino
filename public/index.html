@@ -8,11 +8,12 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
       font-family: sans-serif; 
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      background: #1a472a; 
       color: white; 
       padding: 5px;
       min-height: 100vh;
       overflow-x: hidden;
+      touch-action: manipulation;
     }
     .screen { display: none; }
     .screen.active { display: block; }
@@ -22,7 +23,6 @@
       padding: 15px; 
       max-width: 400px; 
       margin: 20px auto; 
-      border: 2px solid rgba(255,215,0,0.3);
     }
     h1 { text-align: center; color: #ffd700; margin-bottom: 15px; font-size: 1.5em; }
     input { 
@@ -45,12 +45,10 @@
       cursor: pointer;
       font-size: 16px;
     }
-    .btn-green { background: linear-gradient(135deg, #28a745, #1e7e34); color: white; }
-    .btn-blue { background: linear-gradient(135deg, #007bff, #0056b3); color: white; }
-    .btn-red { background: linear-gradient(135deg, #dc3545, #c82333); color: white; font-size: 18px; }
-    .btn-yellow { background: linear-gradient(135deg, #ffc107, #ff9800); color: black; }
-    .btn-left { background: linear-gradient(135deg, #17a2b8, #117a8b); color: white; }
-    .btn-right { background: linear-gradient(135deg, #6610f2, #520dc2); color: white; }
+    .btn-green { background: #28a745; color: white; }
+    .btn-blue { background: #007bff; color: white; }
+    .btn-red { background: #dc3545; color: white; font-size: 18px; }
+    .btn-yellow { background: #ffc107; color: black; }
     .hidden { display: none; }
     #rooms { list-style: none; }
     #rooms li { 
@@ -77,7 +75,7 @@
     .deck-pile { 
       width: 45px; 
       height: 65px; 
-      background: linear-gradient(135deg, #2d5a3d, #1a472a);
+      background: #2d5a3d; 
       border: 3px dashed #ffd700; 
       border-radius: 8px; 
       display: flex; 
@@ -97,53 +95,73 @@
       margin: 10px 0; 
       font-weight: bold;
     }
-    #turn.active { background: linear-gradient(135deg, #28a745, #1e7e34); }
+    #turn.active { background: #28a745; }
     
+    /* 🔥 MESA COMPACTA COM SCROLL */
     .board-container { 
-      background: #1a472a;
-      background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 2px, transparent 2px, transparent 10px);
-      border: 6px solid #3d2817;
-      border-radius: 10px;
-      padding: 10px; 
-      margin: 10px 0; 
+      background: #1a472a; 
+      border: 4px solid #3d2817; 
+      border-radius: 10px; 
+      padding: 8px; 
+      margin: 8px 0; 
       overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
       width: 100%;
     }
-    
-    .board-title {
-      text-align: center;
-      color: #ffd700;
-      font-size: 14px;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-    
     .board { 
       display: flex; 
       align-items: center;
       gap: 3px; 
-      min-height: 60px; 
-      padding: 10px;
+      min-height: 70px; 
+      padding: 8px;
       min-width: max-content;
     }
     
-    /* 🔥 DOMINÓ NA MESA - TODAS HORIZONTAIS (SIMPLES) */
-    .domino-board { 
-      width: 30px; 
-      height: 50px; 
-      background: linear-gradient(145deg, #fef9e7, #e8e8c8);
-      border-radius: 4px; 
+    .drop-zone { 
+      width: 32px; 
+      height: 55px; 
+      border: 2px dashed #ffd700; 
+      border-radius: 6px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      color: #ffd700; 
+      cursor: pointer; 
+      flex-shrink: 0;
+      font-size: 9px;
+      background: rgba(255,215,0,0.1);
+    }
+    .drop-zone:hover { background: rgba(255,215,0,0.2); }
+    .drop-zone.hidden { display: none; }
+    
+    /* 🔥 DOMINÓ COMPACTO PARA MOBILE */
+    .domino { 
+      width: 32px; 
+      height: 55px; 
+      background: #f5f5dc; 
+      border-radius: 5px; 
       display: flex; 
       flex-direction: column; 
-      border: 1px solid #8b7355; 
+      cursor: grab; 
+      border: 2px solid #8b7355; 
       flex-shrink: 0;
-      box-shadow: 1px 1px 4px rgba(0,0,0,0.4);
+      touch-action: none;
+      user-select: none;
     }
-    
-    .domino-board.horizontal { 
-      width: 50px; 
-      height: 30px; 
+    .domino:hover { 
+      transform: translateY(-2px); 
+      border-color: #ffd700;
+    }
+    .domino.horizontal { 
+      width: 55px; 
+      height: 32px; 
       flex-direction: row; 
+    }
+    .domino.dragging { 
+      opacity: 0.6; 
+      transform: scale(1.1);
+      z-index: 1000;
     }
     
     .domino-face { 
@@ -154,9 +172,11 @@
       padding: 2px; 
       gap: 1px; 
     }
-    
     .domino-face.top { border-bottom: 1px solid #8b7355; }
-    .domino-board.horizontal .domino-face.top { border-bottom: none; border-right: 1px solid #8b7355; }
+    .domino.horizontal .domino-face.top { 
+      border-bottom: none; 
+      border-right: 1px solid #8b7355; 
+    }
     
     .pip { 
       background: #000; 
@@ -175,84 +195,21 @@
     .v5 .p1, .v5 .p3, .v5 .p5, .v5 .p7, .v5 .p9 { display: block; }
     .v6 .p1, .v6 .p3, .v6 .p4, .v6 .p6, .v6 .p7, .v6 .p9 { display: block; }
     
-    /* 🔥 DOMINÓ NA MÃO - CLICÁVEL */
     .hand { 
       display: flex; 
       flex-wrap: wrap; 
       gap: 5px; 
       justify-content: center; 
-      min-height: 60px; 
+      min-height: 65px; 
       background: rgba(0,0,0,0.4); 
       border-radius: 10px; 
       padding: 8px; 
     }
-    
-    .domino-hand { 
-      width: 32px; 
-      height: 55px; 
-      background: linear-gradient(145deg, #fef9e7, #e8e8c8);
-      border-radius: 5px; 
-      display: flex; 
-      flex-direction: column; 
-      cursor: pointer; 
-      border: 2px solid #8b7355; 
-      flex-shrink: 0;
-      transition: all 0.2s;
-    }
-    
-    .domino-hand:hover { 
-      transform: translateY(-2px); 
-      border-color: #ffd700;
-    }
-    
-    /* 🔥 PEDRA SELECIONADA */
-    .domino-hand.selected { 
-      border-color: #ffd700;
-      box-shadow: 0 0 15px #ffd700;
-      transform: translateY(-5px);
-    }
-    
-    .domino-hand .domino-face { 
-      flex: 1; 
-      display: grid; 
-      grid-template-columns: repeat(3, 1fr); 
-      grid-template-rows: repeat(3, 1fr); 
-      padding: 3px; 
-      gap: 2px; 
-    }
-    
-    .domino-hand .domino-face.top { border-bottom: 2px solid #8b7355; }
-    
-    /* 🔥 BOTÕES DE JOGADA */
-    #play-buttons {
-      display: none;
-      gap: 8px;
-      justify-content: center;
-      margin: 10px 0;
-      flex-wrap: wrap;
-      animation: fadeIn 0.3s;
-    }
-    
-    #play-buttons.show {
-      display: flex;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    #play-buttons button {
-      width: auto;
-      padding: 10px 20px;
-      font-size: 13px;
-    }
-    
     #action-buttons { 
       display: flex; 
       gap: 8px; 
       justify-content: center; 
-      margin: 10px 0;
+      margin: 8px 0;
       flex-wrap: wrap;
     }
     #action-buttons button { 
@@ -261,26 +218,32 @@
       font-size: 13px;
     }
 
+    /* 🔥 TABLET (600px - 1023px) */
     @media (min-width: 600px) {
       body { padding: 10px; }
       .card { padding: 20px; max-width: 500px; }
       h1 { font-size: 2em; }
-      .domino-hand { width: 38px; height: 65px; }
-      .domino-board { width: 35px; height: 58px; }
-      .domino-board.horizontal { width: 58px; height: 35px; }
+      .domino { width: 40px; height: 68px; }
+      .domino.horizontal { width: 68px; height: 40px; }
       .pip { width: 5px; height: 5px; }
       .deck-pile { width: 55px; height: 75px; }
+      .drop-zone { width: 40px; height: 68px; }
+      .board-container { min-height: 100px; padding: 12px; }
+      .board { min-height: 85px; gap: 4px; }
     }
 
+    /* 🔥 DESKTOP (1024px+) */
     @media (min-width: 1024px) {
       body { padding: 20px; }
       .card { padding: 30px; max-width: 600px; }
       h1 { font-size: 2.5em; }
-      .domino-hand { width: 45px; height: 78px; }
-      .domino-board { width: 42px; height: 70px; }
-      .domino-board.horizontal { width: 70px; height: 42px; }
-      .pip { width: 6px; height: 6px; }
+      .domino { width: 48px; height: 82px; }
+      .domino.horizontal { width: 82px; height: 48px; }
+      .pip { width: 7px; height: 7px; }
       .deck-pile { width: 65px; height: 90px; }
+      .drop-zone { width: 48px; height: 82px; }
+      .board-container { min-height: 130px; padding: 20px; }
+      .board { min-height: 100px; gap: 5px; }
     }
   </style>
 </head>
@@ -319,95 +282,117 @@
     <div>👤 Oponente: <b id="oppCount" style="color:#dc3545">7</b></div>
   </div>
   <div id="turn">⏳ Aguardando...</div>
-  
-  <!-- 🔥 BOTÕES DE JOGADA (APARECEM AO SELECIONAR PEDRA) -->
-  <div id="play-buttons">
-    <button class="btn-left" onclick="playTile('left')">⬅️ Esquerda</button>
-    <button class="btn-right" onclick="playTile('right')">➡️ Direita</button>
-    <button class="btn-yellow" onclick="cancelSelect()">❌ Cancelar</button>
-  </div>
-  
   <div id="action-buttons" class="hidden">
     <button class="btn-blue" onclick="buyTile()">🛒 Comprar</button>
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
-  
   <div class="board-container">
-    <div class="board-title">📌 Mesa</div>
-    <div class="board" id="boardTiles"></div>
+    <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;font-size:14px;">📌 Mesa</h3>
+    <div class="board">
+      <div class="drop-zone hidden" id="dropLeft" ondragover="allowDrop(event)" ondrop="drop(event,'left')">⬅️</div>
+      <div id="boardTiles" style="display:flex;gap:3px;align-items:center;"></div>
+      <div class="drop-zone hidden" id="dropRight" ondragover="allowDrop(event)" ondrop="drop(event,'right')">➡️</div>
+      <div class="drop-zone hidden" id="dropCenter" ondragover="allowDrop(event)" ondrop="drop(event,'center')">🎲</div>
+    </div>
   </div>
-  
-  <h3 style="text-align:center;color:#ffd700;font-size:14px;margin:10px 0 5px;">🎮 Sua Mão (toque para selecionar)</h3>
+  <h3 style="text-align:center;color:#ffd700;font-size:14px;">🎮 Sua Mão</h3>
   <div class="hand" id="hand"></div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io()
-let room = null, myId = null, myTurn = false, isHost = false, hand = [], deck = 14
-let selectedTile = null // 🔥 PEDRA SELECIONADA
+let room = null, myId = null, myTurn = false, isHost = false, draggedTile = null, draggedElement = null, hand = [], deck = 14, touchStartX = 0, touchStartY = 0
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
 }
 
-// 🔥 RENDERIZA PEDRA NA MESA
-function createDominoBoard(v1, v2, horizontal = false) {
+function createDomino(v1, v2, horizontal = false, draggable = false) {
   const n1 = parseInt(v1), n2 = parseInt(v2)
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
   const f1 = '<div class="domino-face top v' + n1 + '">' + pips + '</div>'
   const f2 = '<div class="domino-face bottom v' + n2 + '">' + pips + '</div>'
-  return '<div class="domino-board ' + (horizontal ? 'horizontal' : '') + '">' + f1 + f2 + '</div>'
+  const attrs = (draggable ? 'draggable="true" ondragstart="handleDrag(event)" ontouchstart="handleTouchStart(event)" ontouchmove="handleTouchMove(event)" ontouchend="handleTouchEnd(event)"' : '') + ' data-v1="' + n1 + '" data-v2="' + n2 + '"'
+  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ' + attrs + '>' + f1 + f2 + '</div>'
 }
 
-// 🔥 RENDERIZA PEDRA NA MÃO (CLICÁVEL)
-function createDominoHand(v1, v2, index) {
-  const n1 = parseInt(v1), n2 = parseInt(v2)
-  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
-  const f1 = '<div class="domino-face top v' + n1 + '">' + pips + '</div>'
-  const f2 = '<div class="domino-face bottom v' + n2 + '">' + pips + '</div>'
-  const selected = (selectedTile && selectedTile.index === index) ? ' selected' : ''
-  return '<div class="domino-hand' + selected + '" onclick="selectTile(' + index + ')">' + f1 + f2 + '</div>'
-}
-
-// 🔥 SELECIONAR PEDRA
-function selectTile(index) {
+function handleDrag(e) {
   if (!myTurn) return
-  selectedTile = { index: index, ...hand[index] }
-  renderHand()
-  showPlayButtons()
+  const v1 = e.target.getAttribute('data-v1')
+  const v2 = e.target.getAttribute('data-v2')
+  if (!v1 || !v2) return
+  draggedTile = { v1: parseInt(v1), v2: parseInt(v2) }
+  e.target.classList.add('dragging')
+  draggedElement = e.target
 }
 
-// 🔥 MOSTRAR BOTÕES DE JOGADA
-function showPlayButtons() {
-  document.getElementById('play-buttons').classList.add('show')
-  document.getElementById('action-buttons').classList.add('hidden')
+function handleTouchStart(e) {
+  if (!myTurn) return
+  e.preventDefault()
+  const touch = e.touches[0]
+  const target = e.target.closest('.domino')
+  if (!target) return
+  const v1 = target.getAttribute('data-v1')
+  const v2 = target.getAttribute('data-v2')
+  if (!v1 || !v2) return
+  draggedTile = { v1: parseInt(v1), v2: parseInt(v2) }
+  draggedElement = target
+  touchStartX = touch.clientX
+  touchStartY = touch.clientY
+  target.classList.add('dragging')
+  target.style.position = 'fixed'
+  target.style.left = (touch.clientX - 16) + 'px'
+  target.style.top = (touch.clientY - 28) + 'px'
+  target.style.zIndex = '1000'
 }
 
-// 🔥 ESCONDER BOTÕES DE JOGADA
-function hidePlayButtons() {
-  document.getElementById('play-buttons').classList.remove('show')
+function handleTouchMove(e) {
+  if (!draggedElement) return
+  e.preventDefault()
+  const touch = e.touches[0]
+  draggedElement.style.left = (touch.clientX - 16) + 'px'
+  draggedElement.style.top = (touch.clientY - 28) + 'px'
 }
 
-// 🔥 CANCELAR SELEÇÃO
-function cancelSelect() {
-  selectedTile = null
-  renderHand()
-  hidePlayButtons()
-  checkMovesForButtons()
+function handleTouchEnd(e) {
+  if (!draggedElement) return
+  e.preventDefault()
+  const touch = e.changedTouches[0]
+  let side = null
+  const dropLeft = document.getElementById('dropLeft')
+  const dropRight = document.getElementById('dropRight')
+  const dropCenter = document.getElementById('dropCenter')
+  if (isOverElement(touch.clientX, touch.clientY, dropLeft)) side = 'left'
+  else if (isOverElement(touch.clientX, touch.clientY, dropRight)) side = 'right'
+  else if (isOverElement(touch.clientX, touch.clientY, dropCenter)) side = 'center'
+  else if (isOverElement(touch.clientX, touch.clientY, document.getElementById('boardTiles'))) side = 'right'
+  if (side) socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  draggedElement.classList.remove('dragging')
+  draggedElement.style.position = ''
+  draggedElement.style.left = ''
+  draggedElement.style.top = ''
+  draggedElement.style.zIndex = ''
+  draggedElement = null
+  draggedTile = null
 }
 
-// 🔥 JOGAR PEDRA SELECIONADA
-function playTile(side) {
-  if (!selectedTile || !myTurn || !room) return
-  socket.emit('play', { 
-    code: room, 
-    tile: [selectedTile[0], selectedTile[1]], 
-    side: side 
-  })
-  selectedTile = null
-  hidePlayButtons()
+function isOverElement(x, y, element) {
+  if (!element || element.classList.contains('hidden')) return false
+  const rect = element.getBoundingClientRect()
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
+function allowDrop(e) { e.preventDefault() }
+
+function drop(e, side) {
+  e.preventDefault()
+  if (!draggedTile) return
+  socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  if (draggedElement) draggedElement.classList.remove('dragging')
+  draggedElement = null
+  draggedTile = null
 }
 
 function register() {
@@ -473,7 +458,7 @@ socket.on('gameStart', (data) => {
   deck = data.deckCount
   showScreen('game-screen')
   updateTurn('🎮 Jogo Iniciado!')
-  renderHand()
+  renderHand(hand)
   document.getElementById('action-buttons').classList.add('hidden')
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
@@ -482,32 +467,29 @@ socket.on('gameStart', (data) => {
 socket.on('tilePlayed', (data) => {
   hand = data.hand
   deck = data.deckCount
-  selectedTile = null
-  renderHand()
-  hidePlayButtons()
+  renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
   renderBoard(data.board)
   if (data.turn === myId) {
     updateTurn('✅ SUA VEZ!')
     myTurn = true
-    checkMovesForButtons()
+    checkMoves(data.board)
   } else {
     updateTurn('⏳ Oponente...')
     myTurn = false
     document.getElementById('action-buttons').classList.add('hidden')
+    hideZones()
   }
 })
 
 socket.on('tileBought', (data) => {
   hand = data.hand
   deck = data.deckCount
-  selectedTile = null
-  renderHand()
-  hidePlayButtons()
+  renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
-  checkMovesForButtons()
+  checkMovesAfterBuy(data.board)
 })
 
 socket.on('update', (data) => {
@@ -519,11 +501,12 @@ socket.on('update', (data) => {
   if (data.turn === myId) {
     updateTurn('✅ SUA VEZ!')
     myTurn = true
-    checkMovesForButtons()
+    checkMoves(data.board)
   } else {
     updateTurn('⏳ Oponente...')
     myTurn = false
     document.getElementById('action-buttons').classList.add('hidden')
+    hideZones()
   }
 })
 
@@ -531,32 +514,32 @@ function getBoardEnds(board) {
   if (!board || board.length === 0) return { left: null, right: null }
   const first = board[0]
   const last = board[board.length - 1]
-  const left = Array.isArray(first) ? first[0] : (first.values ? first.values[0] : null)
-  const right = Array.isArray(last) ? last[1] : (last.values ? last.values[1] : null)
+  const left = Array.isArray(first) ? parseInt(first[0]) : null
+  const right = Array.isArray(last) ? parseInt(last[1]) : null
   return { left, right }
 }
 
-// 🔥 VERIFICA SE PODE JOGAR (PARA MOSTRAR BOTÕES)
-function checkMovesForButtons() {
-  const board = [] // Será atualizado pelo socket
+function checkMoves(board) {
   const act = document.getElementById('action-buttons')
   const buy = act.querySelector('.btn-blue')
   const pass = document.getElementById('passBtn')
-  
-  // Pede ao servidor para verificar
-  socket.emit('checkMoves', { code: room })
-}
-
-socket.on('canPlay', (data) => {
-  const act = document.getElementById('action-buttons')
-  const buy = act.querySelector('.btn-blue')
-  const pass = document.getElementById('passBtn')
-  
-  if (data.can) {
+  const ends = getBoardEnds(board)
+  let can = board.length === 0
+  if (!can && ends.left !== null && ends.right !== null) {
+    can = hand.some(t => {
+      const v0 = parseInt(t[0])
+      const v1 = parseInt(t[1])
+      return (v0 === ends.left || v1 === ends.left || v0 === ends.right || v1 === ends.right)
+    })
+  }
+  if (can) {
     act.classList.add('hidden')
+    showZones(board.length === 0)
+    updateTurn('✅ SUA VEZ!')
   } else {
+    hideZones()
     act.classList.remove('hidden')
-    if (data.deck > 0) {
+    if (deck > 0) {
       buy.classList.remove('hidden')
       pass.classList.add('hidden')
       updateTurn('⚠️ Compre!')
@@ -566,7 +549,34 @@ socket.on('canPlay', (data) => {
       updateTurn('⚠️ Passe!')
     }
   }
-})
+}
+
+function checkMovesAfterBuy(board) {
+  const ends = getBoardEnds(board)
+  let can = board.length === 0
+  if (!can && ends.left !== null && ends.right !== null) {
+    can = hand.some(t => {
+      const v0 = parseInt(t[0])
+      const v1 = parseInt(t[1])
+      return (v0 === ends.left || v1 === ends.left || v0 === ends.right || v1 === ends.right)
+    })
+  }
+  if (can) {
+    document.getElementById('action-buttons').classList.add('hidden')
+    showZones(board.length === 0)
+    updateTurn('✅ SUA VEZ!')
+  } else {
+    hideZones()
+    document.getElementById('action-buttons').classList.remove('hidden')
+    if (deck > 0) {
+      document.getElementById('passBtn').classList.add('hidden')
+      updateTurn('⚠️ Compre novamente!')
+    } else {
+      document.getElementById('passBtn').classList.remove('hidden')
+      updateTurn('⚠️ Passe!')
+    }
+  }
+}
 
 function buyTile() {
   if (myTurn && room) {
@@ -582,22 +592,29 @@ function passTurn() {
   }
 }
 
-function renderHand() {
-  if (!hand || !Array.isArray(hand)) return
-  document.getElementById('hand').innerHTML = hand.map((t, i) => createDominoHand(t[0], t[1], i)).join('')
+function renderHand(h) {
+  if (!h || !Array.isArray(h)) return
+  document.getElementById('hand').innerHTML = h.map((t, i) => createDomino(t[0], t[1], false, true)).join('')
 }
 
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
   document.getElementById('boardTiles').innerHTML = b.map(t => {
-    if (!t) return ''
-    if (Array.isArray(t)) {
-      return createDominoBoard(t[0], t[1], false)
-    } else if (t.values) {
-      return createDominoBoard(t.values[0], t.values[1], t.rotation === 'vertical')
-    }
-    return ''
+    if (!t || !Array.isArray(t) || t.length !== 2) return ''
+    return createDomino(t[0], t[1], true)
   }).join('')
+}
+
+function showZones(first) {
+  document.getElementById('dropCenter').classList.toggle('hidden', !first)
+  document.getElementById('dropLeft').classList.toggle('hidden', first)
+  document.getElementById('dropRight').classList.toggle('hidden', first)
+}
+
+function hideZones() {
+  document.getElementById('dropCenter').classList.add('hidden')
+  document.getElementById('dropLeft').classList.add('hidden')
+  document.getElementById('dropRight').classList.add('hidden')
 }
 
 function updateTurn(m) {
@@ -606,10 +623,7 @@ function updateTurn(m) {
   el.classList.toggle('active', m.includes('SUA VEZ'))
 }
 
-socket.on('error', (data) => { 
-  alert('Erro: ' + data.message)
-  cancelSelect()
-})
+socket.on('error', (data) => { alert('Erro: ' + data.message) })
 socket.on('gameOver', () => { alert('🏆 Fim de jogo!'); location.reload() })
 </script>
 </body>

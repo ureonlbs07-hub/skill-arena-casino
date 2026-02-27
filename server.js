@@ -10,7 +10,14 @@ app.use(express.json())
 app.use(express.static("public"))
 
 const server = http.createServer(app)
-const io = new Server(server)
+
+// ✅ CORS ADICIONADO (necessário para produção)
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+})
 
 let rooms = {}
 let users = {}
@@ -60,7 +67,7 @@ io.on("connection", (socket) => {
       turn: null,
       started: false
     }
-    console.log("🏠 Sala criada:", code)
+    console.log("🏠 Sala criada:", code, "Host:", socket.id)
     socket.emit("roomCreated", { code })
     sendRoomList()
   })
@@ -70,19 +77,24 @@ io.on("connection", (socket) => {
     if (!room) return socket.emit("error", { message: "Sala não existe" })
     if (room.started) return socket.emit("error", { message: "Jogo já começou" })
     if (room.guest) return socket.emit("error", { message: "Sala cheia" })
-    if (room.host === socket.id) return socket.emit("error", { message: "Você é o host!" })
+    if (room.host === socket.id) {
+      return socket.emit("error", { message: "Você já é o host desta sala!" })
+    }
 
     room.guest = socket.id
-    console.log("👤 Guest entrou:", code)
+    console.log("👤 Guest entrou:", socket.id, "Sala:", code)
 
-    io.to(room.host).emit("guestJoined", { code })
+    io.to(room.host).emit("guestJoined", { code, guestId: socket.id })
     socket.emit("roomJoined", { code })
     sendRoomList()
   })
 
   socket.on("startGame", (code) => {
     const room = rooms[code]
-    if (!room || room.host !== socket.id || !room.guest) return
+    if (!room) return
+    if (room.host !== socket.id) return socket.emit("error", { message: "Apenas host pode iniciar" })
+    if (!room.guest) return socket.emit("error", { message: "Aguarde o convidado entrar" })
+    if (room.started) return
 
     room.started = true
     const deck = generateDeck()
@@ -98,15 +110,23 @@ io.on("connection", (socket) => {
 
     io.to(room.host).emit("gameStart", {
       hand: room.hands[room.host],
-      deckCount: room.deck.length
+      isHost: true,
+      deckCount: room.deck.length,
+      opponent: users[room.guest]?.username || "Oponente"
     })
 
     io.to(room.guest).emit("gameStart", {
       hand: room.hands[room.guest],
-      deckCount: room.deck.length
+      isHost: false,
+      deckCount: room.deck.length,
+      opponent: users[room.host]?.username || "Oponente"
     })
 
-    io.emit("update", { board: [], turn: room.turn, deckCount: room.deck.length })
+    io.emit("update", {
+      board: [],
+      turn: room.turn,
+      deckCount: room.deck.length
+    })
   })
 
   socket.on("play", ({ code, tile, side }) => {
@@ -115,33 +135,50 @@ io.on("connection", (socket) => {
     if (room.turn !== socket.id) return socket.emit("error", { message: "Não é sua vez!" })
 
     const hand = room.hands[socket.id]
-    const t0 = parseInt(tile[0])
-    const t1 = parseInt(tile[1])
+    if (!hand) return socket.emit("error", { message: "Mão não encontrada" })
 
-    const idx = hand.findIndex(t => parseInt(t[0]) === t0 && parseInt(t[1]) === t1)
-    if (idx === -1) return socket.emit("error", { message: "Pedra não encontrada!" })
+    const tile0 = Number(tile[0])
+    const tile1 = Number(tile[1])
+
+    const tileIndex = hand.findIndex(t => Number(t[0]) === tile0 && Number(t[1]) === tile1)
+
+    if (tileIndex === -1) {
+      return socket.emit("error", { message: "Você não tem esta pedra!" })
+    }
 
     if (room.board.length === 0) {
-      room.board.push([t0, t1])
+      room.board.push([tile0, tile1])
     } else {
       const left = room.board[0][0]
       const right = room.board[room.board.length - 1][1]
       let played = false
 
       if (side === "left") {
-        if (t1 === left) { room.board.unshift([t0, t1]); played = true }
-        else if (t0 === left) { room.board.unshift([t1, t0]); played = true }
+        if (tile1 === left) {
+          room.board.unshift([tile0, tile1])
+          played = true
+        } else if (tile0 === left) {
+          room.board.unshift([tile1, tile0])
+          played = true
+        }
       }
 
       if (side === "right" && !played) {
-        if (t0 === right) { room.board.push([t0, t1]); played = true }
-        else if (t1 === right) { room.board.push([t1, t0]); played = true }
+        if (tile0 === right) {
+          room.board.push([tile0, tile1])
+          played = true
+        } else if (tile1 === right) {
+          room.board.push([tile1, tile0])
+          played = true
+        }
       }
 
-      if (!played) return socket.emit("error", { message: "Não encaixa!" })
+      if (!played) {
+        return socket.emit("error", { message: "Não encaixa! Tente o outro lado." })
+      }
     }
 
-    hand.splice(idx, 1)
+    hand.splice(tileIndex, 1)
 
     if (hand.length === 0) {
       io.emit("gameOver", { winner: socket.id })
@@ -159,46 +196,27 @@ io.on("connection", (socket) => {
       deckCount: room.deck.length
     })
 
-    io.emit("update", { board: room.board, turn: room.turn, deckCount: room.deck.length })
-  })
-
-  socket.on("checkMoves", ({ code }) => {
-    const room = rooms[code]
-    if (!room) return
-    
-    const hand = room.hands[room.turn]
-    const board = room.board
-    
-    let can = board.length === 0
-    if (!can && board.length > 0) {
-      const left = board[0][0]
-      const right = board[board.length - 1][1]
-      can = hand.some(t => t[0] === left || t[1] === left || t[0] === right || t[1] === right)
-    }
-    
-    socket.emit('canPlay', { can, deck: room.deck.length })
+    io.emit("update", {
+      board: room.board,
+      turn: room.turn,
+      deckCount: room.deck.length
+    })
   })
 
   socket.on("buyTile", ({ code }) => {
     const room = rooms[code]
-    if (!room || room.turn !== socket.id || room.deck.length === 0) return
+    if (!room) return socket.emit("error", { message: "Sala não encontrada" })
+    if (room.turn !== socket.id) return socket.emit("error", { message: "Não é sua vez!" })
+    if (room.deck.length === 0) return socket.emit("error", { message: "Monte vazio!" })
 
-    room.hands[socket.id].push(room.deck.pop())
+    const tile = room.deck.pop()
+    room.hands[socket.id].push(tile)
 
     socket.emit("tileBought", {
       hand: room.hands[socket.id],
       deckCount: room.deck.length,
       board: room.board
     })
-  })
-
-  socket.on("passTurn", ({ code }) => {
-    const room = rooms[code]
-    if (!room || room.turn !== socket.id) return
-    
-    room.turn = room.turn === room.host ? room.guest : room.host
-    
-    io.emit("update", { board: room.board, turn: room.turn, deckCount: room.deck.length })
   })
 
   socket.on("disconnect", () => {
@@ -211,7 +229,9 @@ io.on("connection", (socket) => {
   })
 })
 
+// ✅ PORTA CORRIGIDA PARA RAILWAY
 const PORT = process.env.PORT || 3000
-server.listen(PORT, '0.0.0.0', () => {
-  console.log("🚀 Servidor rodando na porta " + PORT)
+
+server.listen(PORT, () => {
+  console.log("🚀 Servidor rodando na porta", PORT)
 })

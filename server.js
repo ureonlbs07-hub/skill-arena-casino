@@ -29,8 +29,22 @@ function generateDeck() {
   return deck.sort(() => Math.random() - 0.5)
 }
 
+// 🔥 FUNÇÃO PARA ENVIAR LISTA DE SALAS A TODOS
+function sendRoomList() {
+  const list = Object.values(rooms).map(r => ({
+    code: r.code,
+    players: (r.host ? 1 : 0) + (r.guest ? 1 : 0),
+    started: r.started,
+    hostId: r.host
+  }))
+  io.emit("roomList", list)
+}
+
 io.on("connection", (socket) => {
   console.log("🔌 Conectado:", socket.id)
+  
+  // 🔥 ENVIA LISTA DE SALAS AO CONECTAR
+  sendRoomList()
 
   socket.on("register", (username) => {
     users[socket.id] = { username }
@@ -48,15 +62,19 @@ io.on("connection", (socket) => {
       deck: [],
       turn: null,
       started: false,
-      direction: 'right' // 🔥 DIREÇÃO ATUAL DO JOGO
+      direction: 'right'
     }
     console.log("🏠 Sala criada:", code)
     socket.emit("roomCreated", { code })
+    
+    // 🔥 ATUALIZA LISTA DE SALAS PARA TODOS
+    sendRoomList()
   })
 
   socket.on("joinRoom", (code) => {
     const room = rooms[code]
     if (!room) return socket.emit("error", { message: "Sala não existe" })
+    if (room.started) return socket.emit("error", { message: "Jogo já começou" })
     if (room.guest) return socket.emit("error", { message: "Sala cheia" })
     if (room.host === socket.id) return socket.emit("error", { message: "Você é o host!" })
 
@@ -65,6 +83,9 @@ io.on("connection", (socket) => {
 
     io.to(room.host).emit("guestJoined", { code })
     socket.emit("roomJoined", { code })
+    
+    // 🔥 ATUALIZA LISTA DE SALAS PARA TODOS
+    sendRoomList()
   })
 
   socket.on("startGame", (code) => {
@@ -97,7 +118,6 @@ io.on("connection", (socket) => {
     io.emit("update", { board: [], turn: room.turn, deckCount: room.deck.length })
   })
 
-  // 🔥 LÓGICA DE ROTAÇÃO DAS PEDRAS
   socket.on("play", ({ code, tile, side }) => {
     const room = rooms[code]
     if (!room) return socket.emit("error", { message: "Sala não encontrada" })
@@ -112,11 +132,10 @@ io.on("connection", (socket) => {
 
     let pieceData = {
       values: [t0, t1],
-      rotation: 'horizontal' // 🔥 ROTAÇÃO: 'horizontal' ou 'vertical'
+      rotation: 'horizontal'
     }
 
     if (room.board.length === 0) {
-      // 🔥 PRIMEIRA PEDRA - HORIZONTAL
       room.board.push(pieceData)
       room.direction = 'right'
     } else {
@@ -124,32 +143,29 @@ io.on("connection", (socket) => {
       const right = room.board[room.board.length - 1].values[1]
       let played = false
 
-      // 🔥 JOGAR NA ESQUERDA
       if (side === "left") {
         if (t1 === left) {
           pieceData.values = [t0, t1]
-          // 🔥 VERTICAL SE MUDAR DIREÇÃO
-          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
           room.board.unshift(pieceData)
           played = true
         } else if (t0 === left) {
           pieceData.values = [t1, t0]
-          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
           room.board.unshift(pieceData)
           played = true
         }
       }
 
-      // 🔥 JOGAR NA DIREITA
       if (side === "right" && !played) {
         if (t0 === right) {
           pieceData.values = [t0, t1]
-          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
           room.board.push(pieceData)
           played = true
         } else if (t1 === right) {
           pieceData.values = [t1, t0]
-          pieceData.rotation = (room.direction === 'up' || room.direction === 'down') ? 'vertical' : 'horizontal'
+          pieceData.rotation = room.board.length % 5 === 0 ? 'vertical' : 'horizontal'
           room.board.push(pieceData)
           played = true
         }
@@ -165,6 +181,7 @@ io.on("connection", (socket) => {
       console.log("🏆 Vencedor!")
       io.emit("gameOver", { winner: socket.id })
       delete rooms[code]
+      sendRoomList()
       return
     }
 
@@ -200,6 +217,7 @@ io.on("connection", (socket) => {
         delete rooms[code]
       }
     }
+    sendRoomList()
   })
 })
 

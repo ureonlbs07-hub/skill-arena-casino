@@ -12,11 +12,7 @@
       margin: 0;
     }
     
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    
+    .container { max-width: 1200px; margin: 0 auto; }
     h1 { color: #28a745; text-align: center; }
     
     .login-box {
@@ -68,6 +64,69 @@
     
     .card h3 { margin-top: 0; color: #28a745; }
     
+    /* 🔥 TOGGLE SWITCH */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      width: 70px;
+      height: 35px;
+    }
+    
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #dc3545;
+      border-radius: 35px;
+      transition: 0.4s;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 27px;
+      width: 27px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      border-radius: 50%;
+      transition: 0.4s;
+    }
+    
+    input:checked + .toggle-slider { background-color: #28a745; }
+    input:checked + .toggle-slider:before { transform: translateX(35px); }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    
+    .status-active { 
+      background: rgba(40,167,69,0.3); 
+      color: #28a745; 
+      border: 2px solid #28a745; 
+    }
+    
+    .status-inactive { 
+      background: rgba(220,53,69,0.3); 
+      color: #dc3545; 
+      border: 2px solid #dc3545; 
+    }
+    
     .balance {
       font-size: 2.5em;
       font-weight: bold;
@@ -105,15 +164,8 @@
       border-left: 3px solid #ffc107;
     }
     
-    .refresh-btn {
-      background: #007bff;
-      margin-bottom: 20px;
-    }
-    
-    .logout-btn {
-      background: #dc3545;
-      float: right;
-    }
+    .refresh-btn { background: #007bff; margin-bottom: 20px; }
+    .logout-btn { background: #dc3545; float: right; }
   </style>
 </head>
 <body>
@@ -136,11 +188,28 @@
     <button class="refresh-btn" onclick="fetchData()">🔄 Atualizar Dados</button>
     
     <div class="cards">
+      <!-- 🔥 MONETIZAÇÃO TOGGLE -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <h3>💰 Monetização</h3>
+        
+        <div class="toggle-container">
+          <span class="toggle-label">Sistema de Apostas</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="monetizationToggle" onchange="toggleMonetization()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div id="statusBadge" class="status-badge status-inactive">
+          ❌ DESATIVADO
+        </div>
+      </div>
+      
       <!-- SALDO DA CASA -->
       <div class="card">
         <h3>💰 Saldo da Casa</h3>
         <div class="balance" id="houseBalance">R$ 0</div>
-        <p style="color: #888; font-size: 0.9em;">30% de cada partida vencedora</p>
+        <p style="color: #888; font-size: 0.9em;">R$ 3 de cada partida</p>
       </div>
 
       <!-- SALAS ATIVAS -->
@@ -163,14 +232,23 @@
 </div>
 
 <script>
-let isAdmin = false
+let adminSession = localStorage.getItem('adminSession')
+let monetizationEnabled = false
+
+// 🔥 VERIFICAR SE JÁ ESTÁ LOGADO
+if (adminSession) {
+  document.getElementById("login").style.display = "none"
+  document.getElementById("dashboard").style.display = "block"
+  fetchData()
+  setInterval(fetchData, 5000)
+}
 
 // LOGIN
 async function login() {
   const password = document.getElementById("adminPassword").value
   
   try {
-    const response = await fetch("/admin/login", {
+    const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password })
@@ -178,13 +256,12 @@ async function login() {
     
     const data = await response.json()
     
-    if (data.ok) {
-      isAdmin = true
+    if (data.success) {
+      adminSession = data.sessionId
+      localStorage.setItem('adminSession', adminSession)
       document.getElementById("login").style.display = "none"
       document.getElementById("dashboard").style.display = "block"
       fetchData()
-      
-      // Atualiza a cada 5 segundos
       setInterval(fetchData, 5000)
     } else {
       document.getElementById("loginError").style.display = "block"
@@ -196,27 +273,77 @@ async function login() {
 }
 
 function logout() {
-  isAdmin = false
+  localStorage.removeItem('adminSession')
+  adminSession = null
   document.getElementById("login").style.display = "block"
   document.getElementById("dashboard").style.display = "none"
   document.getElementById("adminPassword").value = ""
 }
 
-// BUSCAR DADOS
-async function fetchData() {
-  if (!isAdmin) return
+// 🔥 TOGGLE MONETIZAÇÃO
+async function toggleMonetization() {
+  const enabled = document.getElementById('monetizationToggle').checked
   
   try {
-    const response = await fetch("/admin/data")
+    const response = await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: adminSession,
+        monetizationEnabled: enabled
+      })
+    })
+    
+    const data = await response.json()
+    
+    if (data.success) {
+      monetizationEnabled = enabled
+      updateStatusBadge()
+    } else {
+      alert('Erro: ' + data.error)
+      document.getElementById('monetizationToggle').checked = !enabled
+    }
+  } catch (error) {
+    alert('Erro: ' + error.message)
+    document.getElementById('monetizationToggle').checked = !enabled
+  }
+}
+
+function updateStatusBadge() {
+  const badge = document.getElementById('statusBadge')
+  if (monetizationEnabled) {
+    badge.className = 'status-badge status-active'
+    badge.innerHTML = '✅ ATIVADO'
+  } else {
+    badge.className = 'status-badge status-inactive'
+    badge.innerHTML = '❌ DESATIVADO'
+  }
+}
+
+// BUSCAR DADOS
+async function fetchData() {
+  if (!adminSession) return
+  
+  try {
+    // 🔥 BUSCAR CONFIGURAÇÕES
+    const settingsResponse = await fetch("/api/admin/settings")
+    const settings = await settingsResponse.json()
+    
+    monetizationEnabled = settings.monetizationEnabled
+    document.getElementById('monetizationToggle').checked = monetizationEnabled
+    updateStatusBadge()
+    
+    // 🔥 BUSCAR DADOS DO JOGO (você precisa criar essa rota no server)
+    const response = await fetch("/api/admin/data")
     const data = await response.json()
     
     // Atualiza Saldo
     document.getElementById("houseBalance").innerText = 
-      "R$ " + data.houseBalance.toFixed(2)
+      "R$ " + (data.houseBalance || 0).toFixed(2)
     
     // Atualiza Salas
     const roomsList = document.getElementById("roomsList")
-    const rooms = Object.values(data.rooms)
+    const rooms = data.rooms || []
     
     if (rooms.length === 0) {
       roomsList.innerHTML = '<p style="color: #888;">Nenhuma sala ativa</p>'
@@ -224,7 +351,6 @@ async function fetchData() {
       roomsList.innerHTML = rooms.map(room => `
         <div class="room-item">
           <span><strong>Sala ${room.code}</strong></span>
-          <span>Aposta: R$ ${room.stake}</span>
           <span>${room.started ? '🎮 Em jogo' : '⏳ Aguardando'}</span>
         </div>
       `).join('')
@@ -232,17 +358,17 @@ async function fetchData() {
     
     // Atualiza Histórico
     const transactionsList = document.getElementById("transactionsList")
+    const transactions = data.transactions || []
     
-    if (data.transactions.length === 0) {
+    if (transactions.length === 0) {
       transactionsList.innerHTML = '<p style="color: #888;">Nenhuma transação registrada</p>'
     } else {
-      // Mostra as últimas 10 transações
-      const recent = data.transactions.slice(-10).reverse()
+      const recent = transactions.slice(-10).reverse()
       transactionsList.innerHTML = recent.map(t => `
         <div class="transaction">
           <strong>Sala ${t.room}</strong> - Vencedor: ${t.winner}<br>
-          <span style="color: #28a745;">+R$ ${t.winnerShare.toFixed(2)}</span> 
-          <span style="color: #ffc107;">| Casa: +R$ ${t.houseShare.toFixed(2)}</span>
+          <span style="color: #28a745;">+R$ ${(t.winnerShare || 0).toFixed(2)}</span> 
+          <span style="color: #ffc107;">| Casa: +R$ ${(t.houseShare || 0).toFixed(2)}</span>
         </div>
       `).join('')
     }

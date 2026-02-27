@@ -97,6 +97,7 @@
     }
     #turn.active { background: #28a745; }
     
+    /* 🔥 MESA COM SCROLL E SETAS */
     .board-container { 
       background: #1a472a; 
       border: 4px solid #3d2817; 
@@ -107,7 +108,41 @@
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       width: 100%;
+      position: relative;
     }
+    
+    /* 🔥 SETAS DE SCROLL */
+    .scroll-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 24px;
+      color: rgba(255, 215, 0, 0.5);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 10;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    }
+    
+    .scroll-arrow.left {
+      left: 5px;
+    }
+    
+    .scroll-arrow.right {
+      right: 5px;
+    }
+    
+    .scroll-arrow.visible {
+      opacity: 1;
+      animation: pulseArrow 2s infinite;
+    }
+    
+    @keyframes pulseArrow {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    
     .board { 
       display: flex; 
       align-items: center;
@@ -284,7 +319,6 @@
       text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
     }
 
-    /* Mobile */
     @media (max-width: 768px) {
       .dev-signature {
         bottom: 8px;
@@ -343,7 +377,11 @@
     <button class="btn-blue" onclick="buyTile()">🛒 Comprar</button>
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
-  <div class="board-container">
+  <div class="board-container" id="boardContainer">
+    <!-- 🔥 SETAS DE SCROLL -->
+    <div class="scroll-arrow left" id="scrollArrowLeft">◀</div>
+    <div class="scroll-arrow right" id="scrollArrowRight">▶</div>
+    
     <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;font-size:14px;">📌 Mesa</h3>
     <div class="board">
       <div class="drop-zone hidden" id="dropLeft" ondragover="allowDrop(event)" ondrop="drop(event,'left')">⬅️</div>
@@ -366,7 +404,109 @@
 <script>
 const socket = io()
 let room = null, myId = null, myTurn = false, isHost = false, draggedTile = null, draggedElement = null, hand = [], deck = 14, touchStartX = 0, touchStartY = 0
+let wakeLock = null
+let gameRecoveryData = null
 
+// ============================================
+// 🔥 MANTER TELA LIGADA
+// ============================================
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen')
+      console.log('📱 Tela não vai apagar!')
+      wakeLock.addEventListener('release', () => {
+        console.log('⚠️ Wake Lock liberado')
+      })
+    }
+  } catch (err) {
+    console.log('⚠️ Wake Lock não suportado:', err)
+  }
+}
+
+// ============================================
+// 🔥 SALVAR ESTADO DO JOGO
+// ============================================
+function saveGameState() {
+  if (room) {
+    gameRecoveryData = {
+      room,
+      myId,
+      myTurn,
+      isHost,
+      hand,
+      deck,
+      timestamp: Date.now()
+    }
+    localStorage.setItem('dominoGameRecovery', JSON.stringify(gameRecoveryData))
+    console.log('💾 Jogo salvo!')
+  }
+}
+
+function loadGameState() {
+  const saved = localStorage.getItem('dominoGameRecovery')
+  if (saved) {
+    try {
+      gameRecoveryData = JSON.parse(saved)
+      console.log('💾 Jogo recuperado:', gameRecoveryData)
+      return gameRecoveryData
+    } catch (e) {
+      console.log('❌ Erro ao recuperar jogo')
+    }
+  }
+  return null
+}
+
+function clearGameState() {
+  localStorage.removeItem('dominoGameRecovery')
+  gameRecoveryData = null
+  console.log('🗑️ Jogo limpo')
+}
+
+// ============================================
+// 🔥 AVISAR ANTES DE SAIR
+// ============================================
+window.addEventListener('beforeunload', (e) => {
+  if (room) {
+    e.preventDefault()
+    e.returnValue = 'Você está em uma partida! Sair pode causar derrota.'
+    saveGameState()
+    return 'Você está em uma partida!'
+  }
+})
+
+// ============================================
+// 🔥 SETAS DE SCROLL DA MESA
+// ============================================
+function updateScrollArrows() {
+  const container = document.getElementById('boardContainer')
+  const arrowLeft = document.getElementById('scrollArrowLeft')
+  const arrowRight = document.getElementById('scrollArrowRight')
+  
+  if (!container) return
+  
+  const scrollLeft = container.scrollLeft
+  const scrollWidth = container.scrollWidth
+  const clientWidth = container.clientWidth
+  
+  // Seta esquerda: mostra se tem conteúdo à esquerda
+  if (scrollLeft > 10) {
+    arrowLeft.classList.add('visible')
+  } else {
+    arrowLeft.classList.remove('visible')
+  }
+  
+  // Seta direita: mostra se tem conteúdo à direita
+  if (scrollLeft < scrollWidth - clientWidth - 10) {
+    arrowRight.classList.add('visible')
+  } else {
+    arrowRight.classList.remove('visible')
+  }
+}
+
+// ============================================
+// FUNÇÕES DO JOGO
+// ============================================
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
@@ -525,6 +665,12 @@ socket.on('gameStart', (data) => {
   document.getElementById('action-buttons').classList.add('hidden')
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
+  
+  // 🔥 ATIVAR WAKE LOCK
+  requestWakeLock()
+  
+  // 🔥 LIMPAR ESTADO SALVO (novo jogo)
+  clearGameState()
 })
 
 socket.on('tilePlayed', (data) => {
@@ -666,6 +812,9 @@ function renderBoard(b) {
     if (!t || !Array.isArray(t) || t.length !== 2) return ''
     return createDomino(t[0], t[1], true)
   }).join('')
+  
+  // 🔥 ATUALIZAR SETAS DEPOIS DE RENDERIZAR
+  setTimeout(updateScrollArrows, 100)
 }
 
 function showZones(first) {
@@ -687,7 +836,28 @@ function updateTurn(m) {
 }
 
 socket.on('error', (data) => { alert('Erro: ' + data.message) })
-socket.on('gameOver', () => { alert('🏆 Fim de jogo!'); location.reload() })
+socket.on('gameOver', () => { 
+  clearGameState()
+  alert('🏆 Fim de jogo!')
+  location.reload() 
+})
+
+// ============================================
+// 🔥 EVENT LISTENERS PARA SCROLL
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+  const boardContainer = document.getElementById('boardContainer')
+  if (boardContainer) {
+    boardContainer.addEventListener('scroll', updateScrollArrows)
+    window.addEventListener('resize', updateScrollArrows)
+  }
+  
+  // 🔥 VERIFICAR SE TEM JOGO SALVO
+  const savedGame = loadGameState()
+  if (savedGame) {
+    console.log('🎮 Jogo recuperado disponível')
+  }
+})
 </script>
 </body>
 </html>

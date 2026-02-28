@@ -4,12 +4,20 @@ const express = require("express")
 const http = require("http")
 const { Server } = require("socket.io")
 const { v4: uuid } = require("uuid")
+const mercadopago = require("mercadopago")
 
 const app = express()
 app.use(express.json())
 app.use(express.static("public"))
 
 const server = http.createServer(app)
+
+// ============================================
+// 🔥 CONFIGURAÇÃO MERCADO PAGO
+// ============================================
+mercadopago.configure({
+  access_token: process.env.MP_ACCESS_TOKEN || ''
+})
 
 // ✅ CORS ADICIONADO (necessário para produção)
 const io = new Server(server, {
@@ -24,12 +32,13 @@ const io = new Server(server, {
 // ============================================
 let rooms = {}
 let users = {}
+let payments = {} // 🔥 NOVO: Controle de pagamentos
 
 // ============================================
 // 🔥 CONFIGURAÇÕES DO ADMIN
 // ============================================
 let adminSettings = {
-  monetizationEnabled: false, // 🔥 Toggle ON/OFF
+  monetizationEnabled: false, // 🔥 Toggle ON/OFF (padrão false para testes)
   entryFee: 10.00,
   prize: 17.00,
   houseFee: 3.00,
@@ -69,6 +78,178 @@ function sendRoomList() {
   }))
   io.emit("roomList", list)
 }
+
+// ============================================
+// 🔥 ROTAS DE PAGAMENTO PIX
+// ============================================
+
+// Gerar pagamento PIX
+app.post('/api/payment/create', async (req, res) => {
+  const { userId, roomId, playerType } = req.body
+  
+  if (!userId || !roomId) {
+    return res.status(400).json({ success: false, error: 'Dados inválidos' })
+  }
+  
+  const transactionId = uuid()
+  
+  // 🔥 Verificar se monetização está ativa
+  if (!adminSettings.monetizationEnabled) {
+    // Modo teste - simular pagamento aprovado
+    payments[transactionId] = {
+      id: transactionId,
+      userId,
+      roomId,
+      playerType,
+      amount: adminSettings.entryFee,
+      status: 'approved',
+      pixCode: 'MODO_TESTE_SEM_PAGAMENTO',
+      pixQRCode: '',
+      createdAt: Date.now()
+    }
+    
+    // Liberar jogador imediatamente
+    const room = rooms[roomId]
+    if (room) {
+      if (playerType === 'host') {
+        room.hostPaid = true
+        io.to(userId).emit("paymentConfirmed", { roomId })
+      } else if (playerType === 'guest') {
+        room.guestPaid = true
+        io.to(userId).emit("paymentConfirmed", { roomId })
+        io.to(room.host).emit("bothPaid", { roomId })
+      }
+    }
+    
+    return res.json({
+      success: true,
+      transactionId,
+      pixCode: 'MODO_TESTE',
+      pixQRCode: '',
+      amount: adminSettings.entryFee,
+      testMode: true
+    })
+  }
+  
+  // 🔥 Criar preferência de pagamento (Produção)
+  const preference = {
+    transaction_amount: adminSettings.entryFee,
+    description: `Entrada Sala ${roomId} - ${playerType}`,
+    payment_method_id: 'pix',
+    payer: {
+      email: `${userId}@skillarena.com`
+    },
+    external_reference: transactionId,
+    metadata: {
+      userId,
+      roomId,
+      playerType
+    }
+  }
+  
+  try {
+    const result = await mercadopago.payment.create(preference)
+    
+    // 🔥 Salvar transação
+    payments[transactionId] = {
+      id: transactionId,
+      userId,
+      roomId,
+      playerType,
+      amount: adminSettings.entryFee,
+      status: 'pending',
+      pixCode: result.body.point_of_interaction?.transaction_data?.ticket_url || '',
+      pixQRCode: result.body.point_of_interaction?.transaction_data?.qr_code_base64 || '',
+      createdAt: Date.now()
+    }
+    
+    console.log('💰 PIX gerado:', transactionId)
+    
+    res.json({
+      success: true,
+      transactionId,
+      pixCode: payments[transactionId].pixCode,
+      pixQRCode: payments[transactionId].pixQRCode,
+      amount: adminSettings.entryFee,
+      testMode: false
+    })
+  } catch (error) {
+    console.error('❌ Erro ao criar PIX:', error)
+    res.status(500).json({ success: false, error: 'Erro ao gerar PIX' })
+  }
+})
+
+// Verificar status do pagamento
+app.get('/api/payment/status/:transactionId', (req, res) => {
+  const { transactionId } = req.params
+  const payment = payments[transactionId]
+  
+  if (!payment) {
+    return res.status(404).json({ success: false, error: 'Transação não encontrada' })
+  }
+  
+  res.json({
+    success: true,
+    status: payment.status,
+    paid: payment.status === 'approved'
+  })
+})
+
+// Webhook do Mercado Pago (callback automático)
+app.post('/api/payment/webhook', async (req, res) => {
+  const { action, data } = req.body
+  
+  if (action === 'payment.created' || action === 'payment.updated') {
+    try {
+      const payment = await mercadopago.payment.get(data.id)
+      const externalRef = payment.body.external_reference
+      
+      if (payments[externalRef]) {
+        payments[externalRef].status = payment.body.status
+        
+        // 🔥 Se aprovado, liberar jogador na sala
+        if (payment.body.status === 'approved') {
+          const { roomId, userId, playerType } = payments[externalRef].metadata
+          const room = rooms[roomId]
+          
+          if (room) {
+            if (playerType === 'host') {
+              room.hostPaid = true
+              console.log('✅ Host pagou:', roomId)
+              io.to(userId).emit("paymentConfirmed", { roomId })
+            } else if (playerType === 'guest') {
+              room.guestPaid = true
+              console.log('✅ Guest pagou:', roomId)
+              io.to(userId).emit("paymentConfirmed", { roomId })
+            }
+            
+            // 🔥 Notificar host que ambos pagaram
+            if (room.guestPaid && room.hostPaid) {
+              io.to(room.host).emit("bothPaid", { roomId })
+            }
+          }
+          
+          // 🔥 Registrar transação
+          transactions.push({
+            id: externalRef,
+            roomId,
+            userId,
+            amount: adminSettings.entryFee,
+            status: 'approved',
+            timestamp: Date.now()
+          })
+        }
+      }
+      
+      res.status(200).send('OK')
+    } catch (error) {
+      console.error('❌ Erro no webhook:', error)
+      res.status(500).send('Error')
+    }
+  } else {
+    res.status(200).send('OK')
+  }
+})
 
 // ============================================
 // 🔥 ROTAS DE ADMIN
@@ -130,7 +311,8 @@ app.get('/api/admin/data', (req, res) => {
     houseBalance,
     rooms: Object.values(rooms),
     transactions,
-    settings: adminSettings
+    settings: adminSettings,
+    payments: Object.values(payments)
   })
 })
 
@@ -158,7 +340,7 @@ io.on("connection", (socket) => {
     console.log('✅ Usuário registrado:', username)
   })
 
-  // Criar sala
+  // 🔥 Criar sala - agora verifica monetização
   socket.on("createRoom", () => {
     const code = generateCode()
     rooms[code] = {
@@ -174,11 +356,25 @@ io.on("connection", (socket) => {
       guestPaid: false
     }
     console.log("🏠 Sala criada:", code, "Host:", socket.id)
-    socket.emit("roomCreated", { code })
+    
+    // 🔥 Se monetização ativa, enviar para pagamento
+    if (adminSettings.monetizationEnabled) {
+      socket.emit("paymentRequired", {
+        amount: adminSettings.entryFee,
+        roomId: code,
+        userId: socket.id,
+        playerType: 'host'
+      })
+    } else {
+      // Modo teste - libera direto
+      rooms[code].hostPaid = true
+      socket.emit("roomCreated", { code })
+    }
+    
     sendRoomList()
   })
 
-  // Entrar na sala
+  // 🔥 Entrar na sala - agora verifica monetização para guest
   socket.on("joinRoom", (code) => {
     const room = rooms[code]
     if (!room) return socket.emit("error", { message: "Sala não existe" })
@@ -191,17 +387,39 @@ io.on("connection", (socket) => {
     room.guest = socket.id
     console.log("👤 Guest entrou:", socket.id, "Sala:", code)
 
+    // 🔥 Se monetização ativa, guest precisa pagar
+    if (adminSettings.monetizationEnabled) {
+      socket.emit("paymentRequired", {
+        amount: adminSettings.entryFee,
+        roomId: code,
+        userId: socket.id,
+        playerType: 'guest'
+      })
+      return
+    }
+    
+    // Modo teste - libera direto
+    room.guestPaid = true
     io.to(room.host).emit("guestJoined", { code, guestId: socket.id })
+    io.to(room.host).emit("bothPaid", { code })
     socket.emit("roomJoined", { code })
     sendRoomList()
   })
 
-  // Iniciar jogo
+  // 🔥 Iniciar jogo - verificar se ambos pagaram
   socket.on("startGame", (code) => {
     const room = rooms[code]
     if (!room) return
     if (room.host !== socket.id) return socket.emit("error", { message: "Apenas host pode iniciar" })
     if (!room.guest) return socket.emit("error", { message: "Aguarde o convidado entrar" })
+    
+    // 🔥 VERIFICAR PAGAMENTOS (só se monetização ativa)
+    if (adminSettings.monetizationEnabled) {
+      if (!room.hostPaid || !room.guestPaid) {
+        return socket.emit("error", { message: "Ambos devem pagar para iniciar!" })
+      }
+    }
+    
     if (room.started) return
 
     room.started = true
@@ -237,7 +455,7 @@ io.on("connection", (socket) => {
     })
   })
 
-  // Jogar pedra
+  // Jogar pedra (MANTIDO IGUAL)
   socket.on("play", ({ code, tile, side }) => {
     const room = rooms[code]
     if (!room) return socket.emit("error", { message: "Sala não encontrada" })
@@ -328,7 +546,7 @@ io.on("connection", (socket) => {
     })
   })
 
-  // Comprar pedra
+  // Comprar pedra (MANTIDO IGUAL)
   socket.on("buyTile", ({ code }) => {
     const room = rooms[code]
     if (!room) return socket.emit("error", { message: "Sala não encontrada" })
@@ -347,7 +565,7 @@ io.on("connection", (socket) => {
     })
   })
 
-  // Passar vez
+  // Passar vez (MANTIDO IGUAL)
   socket.on("passTurn", ({ code }) => {
     const room = rooms[code]
     if (!room || room.turn !== socket.id) return
@@ -361,7 +579,7 @@ io.on("connection", (socket) => {
     })
   })
 
-  // Disconnect
+  // Disconnect (MANTIDO IGUAL)
   socket.on("disconnect", () => {
     console.log("❌ Disconnect:", socket.id)
     for (const code in rooms) {
@@ -383,6 +601,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log("🚀 Servidor rodando na porta", PORT)
   console.log("🔐 Admin Panel: http://localhost:" + PORT + "/admin")
   console.log("🎮 Jogo: http://localhost:" + PORT)
-  console.log("💰 Monetização:", adminSettings.monetizationEnabled ? '✅ ATIVADA' : '❌ DESATIVADA')
+  console.log("💰 Monetização:", adminSettings.monetizationEnabled ? '✅ ATIVADA' : '❌ DESATIVADA (Modo Teste)')
+  console.log("📡 Webhook PIX: http://localhost:" + PORT + "/api/payment/webhook")
   console.log("============================================")
 })

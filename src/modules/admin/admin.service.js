@@ -1,49 +1,60 @@
 const db = require('../../config/database')
 
 class AdminService {
-  // ✅ CORRIGIDO: Atualiza setting no banco
   async updateSetting(key, value) {
     try {
-      // Primeiro verifica se existe
+      console.log('🔧 updateSetting chamado:', { key, value })
+      
       const checkResult = await db.query(
-        `SELECT 1 FROM settings WHERE key = $1`,
+        `SELECT * FROM settings WHERE key = $1`,
         [key]
       )
       
+      console.log('📊 Setting encontrada:', checkResult.rows)
+      
       if (checkResult.rows.length > 0) {
-        // Atualiza se existe
         await db.query(
           `UPDATE settings SET value = $1 WHERE key = $2`,
           [value, key]
         )
+        console.log('✅ UPDATE realizado')
       } else {
-        // Insere se não existe
         await db.query(
           `INSERT INTO settings (key, value) VALUES ($1, $2)`,
           [key, value]
         )
+        console.log('✅ INSERT realizado')
       }
       
-      console.log(`✅ Setting atualizada: ${key} = ${value}`)
       return true
     } catch (error) {
-      console.error('❌ Erro ao atualizar setting:', error)
+      console.error('❌ Erro updateSetting:', error)
       throw error
     }
   }
 
-  // ✅ Pega todas as settings
   async getAllSettings() {
     try {
+      console.log('🔧 getAllSettings chamado')
+      
       const result = await db.query(`SELECT * FROM settings`)
       
-      // Converte array para objeto
+      console.log('📊 Todas as settings:', result.rows)
+      console.log('📊 Colunas:', result.fields)
+      
       const settings = {}
       result.rows.forEach(row => {
-        settings[row.key] = row.value
+        // ✅ Tenta diferentes nomes de coluna
+        const key = row.key || row.setting_key || row.name
+        const value = row.value || row.setting_value || row.val
+        if (key) {
+          settings[key] = value
+        }
       })
       
-      // ✅ Garante valores padrão se não existir
+      console.log('📊 Settings processadas:', settings)
+      
+      // Valores padrão
       if (settings.monetization_enabled === undefined) {
         settings.monetization_enabled = 'false'
       }
@@ -59,8 +70,7 @@ class AdminService {
       
       return settings
     } catch (error) {
-      console.error('❌ Erro ao pegar settings:', error)
-      // Retorna valores padrão em caso de erro
+      console.error('❌ Erro getAllSettings:', error)
       return {
         monetization_enabled: 'false',
         entry_fee: '10',

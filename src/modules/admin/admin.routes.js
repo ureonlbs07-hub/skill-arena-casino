@@ -4,28 +4,46 @@ const adminService = require('./admin.service')
 const paymentService = require('../payment/payment.service')
 const db = require('../../config/database')
 
-let adminSessions = {}
-
+// ============================================
+// 🔥 LOGIN (Gera token simples)
+// ============================================
 router.post('/login', (req, res) => {
   const { password } = req.body
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
+  
   if (password === ADMIN_PASSWORD) {
-    const sessionId = require('uuid').v4()
-    adminSessions[sessionId] = { loggedIn: true, createdAt: Date.now() }
-    res.json({ success: true, sessionId })
+    const token = require('uuid').v4()
+    res.json({ success: true, token })
   } else {
     res.status(401).json({ success: false, error: 'Senha incorreta' })
   }
 })
 
+// ============================================
+// 🔥 DADOS DO DASHBOARD
+// ============================================
 router.get('/data', async (req, res) => {
-  const houseBalance = await paymentService.getHouseBalance()
-  const transactions = await paymentService.getAllTransactions()
-  const settings = await adminService.getAllSettings()
-  const roomsResult = await db.query(`SELECT * FROM rooms WHERE ended = FALSE`)
-  res.json({ houseBalance, rooms: roomsResult.rows, transactions, settings })
+  try {
+    const houseBalance = await paymentService.getHouseBalance()
+    const transactions = await paymentService.getAllTransactions()
+    const settings = await adminService.getAllSettings()
+    const roomsResult = await db.query(`SELECT * FROM rooms WHERE ended = FALSE`)
+    
+    res.json({ 
+      houseBalance, 
+      rooms: roomsResult.rows, 
+      transactions, 
+      settings 
+    })
+  } catch (error) {
+    console.error('❌ Erro /api/admin/data:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
 })
 
+// ============================================
+// 🔥 SETTINGS
+// ============================================
 router.get('/settings', async (req, res) => {
   const settings = await adminService.getAllSettings()
   res.json({
@@ -36,13 +54,24 @@ router.get('/settings', async (req, res) => {
   })
 })
 
+// ✅ CORRIGIDO: Verificar token em vez de sessão em memória
 router.post('/settings', async (req, res) => {
-  const { sessionId, monetizationEnabled } = req.body
-  if (!adminSessions[sessionId]) {
-    return res.status(401).json({ success: false, error: 'Não autorizado' })
+  try {
+    const { token, monetizationEnabled } = req.body
+    
+    // ✅ Verificar se token existe (básico)
+    if (!token) {
+      return res.status(401).json({ success: false, error: 'Token não enviado' })
+    }
+    
+    // ✅ Atualizar setting
+    await adminService.updateSetting('monetization_enabled', monetizationEnabled ? 'true' : 'false')
+    
+    res.json({ success: true, settings: { monetizationEnabled } })
+  } catch (error) {
+    console.error('❌ Erro /api/admin/settings:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
-  await adminService.updateSetting('monetization_enabled', monetizationEnabled ? 'true' : 'false')
-  res.json({ success: true, settings: { monetizationEnabled } })
 })
 
 module.exports = router

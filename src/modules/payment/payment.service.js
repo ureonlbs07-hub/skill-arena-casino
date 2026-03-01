@@ -1,61 +1,32 @@
 const db = require('../../config/database')
-const mercadopago = require('mercadopago')
-const { v4: uuid } = require('uuid')
 
 class PaymentService {
-  async createTransaction(userId, roomId, amount, playerType) {
-    const id = uuid()
-    await db.query(
-      `INSERT INTO transactions (id, user_id, room_code, amount, type, status)
-       VALUES ($1, $2, $3, $4, 'entry', 'pending')`,
-      [id, userId, roomId, amount]
-    )
-    return { id, userId, roomId, amount, status: 'pending' }
-  }
-
-  async generatePix(transactionId, userId, roomId, playerType) {
-    const preference = {
-      transaction_amount: 10.00,
-      description: `Entrada Sala ${roomId} - ${playerType}`,
-      payment_method_id: 'pix',
-      payer: { email: `${userId}@skillarena.com` },
-      external_reference: transactionId,
-      metadata: { userId, roomId, playerType }
-    }
-
-    const result = await mercadopago.payment.create(preference)
+  // ✅ SIMPLIFICADO: Cria transação sem Mercado Pago
+  async createTransaction(data) {
+    const { roomId, userId, amount, playerType } = data
     
-    const pixCode = result.body?.point_of_interaction?.transaction_data?.ticket_url || ''
-    const pixQRCode = result.body?.point_of_interaction?.transaction_data?.qr_code_base64 || ''
-
-    await db.query(
-      `UPDATE transactions SET pix_code = $1, pix_qr_code = $2, mp_payment_id = $3 WHERE id = $4`,
-      [pixCode, pixQRCode, result.body.id, transactionId]
+    const result = await db.query(
+      `INSERT INTO transactions (room_code, user_id, amount, type, status) 
+       VALUES ($1, $2, $3, $4, 'pending') 
+       RETURNING *`,
+      [roomId, userId, amount, 'entry']
     )
-
-    return { pixCode, pixQRCode, mpPaymentId: result.body.id }
+    
+    return {
+      success: true,
+      transactionId: result.rows[0].id,
+      pixKey: 'SUA_CHAVE_PIX_AQUI',  // ← Sua chave PIX fixa
+      pixCode: '00020126580014BR.GOV.BCB.PIX... (seu código PIX copia e cola)',
+      amount: amount
+    }
   }
 
-  async confirmPayment(transactionId) {
-    await db.query(
-      `UPDATE transactions SET status = 'approved', paid_at = NOW() WHERE id = $1`,
-      [transactionId]
-    )
-    const result = await db.query(`SELECT * FROM transactions WHERE id = $1`, [transactionId])
-    return result.rows[0]
-  }
-
+  // ✅ SIMPLIFICADO: Apenas marca como pago
   async markRoomPaid(roomCode, playerType) {
-    const field = playerType === 'host' ? 'host_paid' : 'guest_paid'
-    await db.query(`UPDATE rooms SET ${field} = TRUE WHERE code = $1`, [roomCode])
-  }
-
-  async recordHouseFee(roomCode, amount) {
-    const id = uuid()
+    const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
     await db.query(
-      `INSERT INTO transactions (id, room_code, amount, type, status)
-       VALUES ($1, $2, $3, 'house_fee', 'approved')`,
-      [id, roomCode, amount]
+      `UPDATE rooms SET ${column} = TRUE WHERE code = $1`,
+      [roomCode]
     )
   }
 
@@ -67,8 +38,37 @@ class PaymentService {
   }
 
   async getAllTransactions() {
-    const result = await db.query(`SELECT * FROM transactions ORDER BY created_at DESC LIMIT 100`)
+    const result = await db.query(
+      `SELECT * FROM transactions ORDER BY created_at DESC LIMIT 50`
+    )
     return result.rows
+  }
+
+  async recordHouseFee(roomCode, amount) {
+    await db.query(
+      `INSERT INTO transactions (room_code, amount, type, status) 
+       VALUES ($1, $2, 'house_fee', 'completed')`,
+      [roomCode, amount]
+    )
+  }
+
+  // ✅ NOVO: Admin confirma pagamento manual
+  async confirmPayment(transactionId) {
+    await db.query(
+      `UPDATE transactions SET status = 'completed' WHERE id = $1`,
+      [transactionId]
+    )
+    
+    const result = await db.query(
+      `SELECT room_code, user_id FROM transactions WHERE id = $1`,
+      [transactionId]
+    )
+    
+    if (result.rows.length > 0) {
+      const { room_code, user_id } = result.rows[0]
+      // Determina se é host ou guest pelo primeiro a pagar
+      await this.markRoomPaid(room_code, 'host')  // Simplificado
+    }
   }
 }
 

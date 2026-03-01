@@ -1,41 +1,79 @@
 const express = require('express')
 const router = express.Router()
 const paymentService = require('./payment.service')
-const db = require('../../config/database')
 
+// ✅ SIMPLIFICADO: Cria transação manual
 router.post('/create', async (req, res) => {
-  const { userId, roomId, playerType } = req.body
-  if (!userId || !roomId) {
-    return res.status(400).json({ success: false, error: 'Dados inválidos' })
-  }
   try {
-    const transaction = await paymentService.createTransaction(userId, roomId, 10.00, playerType)
-    const pixData = await paymentService.generatePix(transaction.id, userId, roomId, playerType)
+    const { roomId, userId, amount, playerType } = req.body
+    
+    const result = await paymentService.createTransaction({
+      roomId,
+      userId,
+      amount,
+      playerType
+    })
+    
     res.json({
       success: true,
-      transactionId: transaction.id,
-      pixCode: pixData.pixCode,
-      pixQRCode: pixData.pixQRCode,
-      amount: 10.00,
-      testMode: false
+      transactionId: result.transactionId,
+      pixKey: result.pixKey,
+      pixCode: result.pixCode,
+      amount: result.amount
     })
   } catch (error) {
-    console.error('❌ Erro ao criar PIX:', error)
-    res.status(500).json({ success: false, error: 'Erro ao gerar PIX' })
+    console.error('Erro ao criar transação:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
+// ✅ SIMPLIFICADO: Verifica status (sempre retorna pending até admin confirmar)
 router.get('/status/:transactionId', async (req, res) => {
-  const { transactionId } = req.params
-  const result = await db.query(`SELECT status FROM transactions WHERE id = $1`, [transactionId])
-  if (!result.rows[0]) {
-    return res.status(404).json({ success: false, error: 'Transação não encontrada' })
+  try {
+    const { transactionId } = req.params
+    
+    const result = await db.query(
+      `SELECT * FROM transactions WHERE id = $1`,
+      [transactionId]
+    )
+    
+    if (result.rows.length === 0) {
+      return res.json({ paid: false })
+    }
+    
+    const transaction = result.rows[0]
+    res.json({ 
+      paid: transaction.status === 'completed',
+      status: transaction.status
+    })
+  } catch (error) {
+    res.status(500).json({ paid: false, error: error.message })
   }
-  res.json({
-    success: true,
-    status: result.rows[0].status,
-    paid: result.rows[0].status === 'approved'
-  })
+})
+
+// ✅ NOVO: Admin confirma pagamento manualmente
+router.post('/confirm', async (req, res) => {
+  try {
+    const { transactionId } = req.body
+    
+    await paymentService.confirmPayment(transactionId)
+    
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ✅ NOVO: Lista transações pendentes
+router.get('/pending', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT * FROM transactions WHERE status = 'pending' ORDER BY created_at DESC`
+    )
+    res.json({ transactions: result.rows })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
 })
 
 module.exports = router

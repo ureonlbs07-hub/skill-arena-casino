@@ -4,6 +4,7 @@ const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
 const cors = require('cors')
+const fs = require('fs')
 
 const db = require('./src/config/database')
 const gameService = require('./src/modules/game/game.service')
@@ -46,6 +47,7 @@ app.get('/api/monetization-status', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() })
 })
+
 // ============================================
 // 🔥 ROTA DO ADMIN
 // ============================================
@@ -53,6 +55,18 @@ app.get('/admin', (req, res) => {
   res.sendFile(__dirname + '/public/admin.html')
 })
 
+// ============================================
+// 🔥 AUTO-CRIAR TABELAS NO STARTUP
+// ============================================
+async function initDatabase() {
+  try {
+    const schema = fs.readFileSync('./database/schema.sql', 'utf8')
+    await db.query(schema)
+    console.log('✅ Tabelas criadas/atualizadas!')
+  } catch (err) {
+    console.error('❌ Erro ao criar tabelas:', err.message)
+  }
+}
 
 io.on('connection', (socket) => {
   console.log('🔌 Conectado:', socket.id)
@@ -287,13 +301,19 @@ function sendRoomList() {
   io.emit('roomList', list)
 }
 
+// ============================================
+// 🚀 INICIAR SERVIDOR
+// ============================================
 const PORT = process.env.PORT || 3000
 
-server.listen(PORT, '0.0.0.0', async () => {
-  console.log('============================================')
-  console.log('🚀 Servidor rodando na porta', PORT)
-  console.log('🔐 Admin: http://localhost:' + PORT + '/admin')
-  console.log('🎮 Jogo: http://localhost:' + PORT)
-  console.log('📊 PostgreSQL: Conectado')
-  console.log('============================================')
+// Inicializa banco ANTES de iniciar o servidor
+initDatabase().then(() => {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('============================================')
+    console.log('🚀 Servidor rodando na porta', PORT)
+    console.log('🔐 Admin: http://localhost:' + PORT + '/admin')
+    console.log('🎮 Jogo: http://localhost:' + PORT)
+    console.log('📊 PostgreSQL: Conectado')
+    console.log('============================================')
+  })
 })

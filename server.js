@@ -46,6 +46,13 @@ app.get('/api/monetization-status', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() })
 })
+// ============================================
+// 🔥 ROTA DO ADMIN
+// ============================================
+app.get('/admin', (req, res) => {
+  res.sendFile(__dirname + '/public/admin.html')
+})
+
 
 io.on('connection', (socket) => {
   console.log('🔌 Conectado:', socket.id)

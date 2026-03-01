@@ -208,7 +208,8 @@
 </div>
 
 <script>
-let sessionId = null
+// ✅ CORRIGIDO: adminToken em vez de sessionId
+let adminToken = null
 
 // ============================================
 // 🔥 LOGIN
@@ -225,8 +226,9 @@ function adminLogin() {
   .then(res => res.json())
   .then(data => {
     if (data.success) {
-      sessionId = data.sessionId
-      localStorage.setItem('adminSessionId', sessionId)
+      // ✅ CORRIGIDO: token em vez de sessionId
+      adminToken = data.token
+      localStorage.setItem('adminToken', adminToken)
       showMessage('loginMessage', 'Login realizado com sucesso!', 'success')
       setTimeout(() => {
         showScreen('dashboard-screen')
@@ -243,8 +245,9 @@ function adminLogin() {
 }
 
 function adminLogout() {
-  sessionId = null
-  localStorage.removeItem('adminSessionId')
+  // ✅ CORRIGIDO: adminToken em vez de sessionId
+  adminToken = null
+  localStorage.removeItem('adminToken')
   showScreen('login-screen')
   document.getElementById('adminPassword').value = ''
   showMessage('loginMessage', '', '')
@@ -269,9 +272,10 @@ function showMessage(elementId, message, type) {
 }
 
 function loadAdminData() {
-  if (!sessionId) {
-    const saved = localStorage.getItem('adminSessionId')
-    if (saved) sessionId = saved
+  // ✅ CORRIGIDO: adminToken em vez de sessionId
+  if (!adminToken) {
+    const saved = localStorage.getItem('adminToken')
+    if (saved) adminToken = saved
     else return showScreen('login-screen')
   }
   
@@ -319,11 +323,11 @@ function loadAdminData() {
       list.innerHTML = data.transactions.slice(-20).reverse().map(t => `
         <div class="transaction-item">
           <div style="display:flex;justify-content:space-between;">
-            <strong>Sala: ${t.room}</strong>
+            <strong>Sala: ${t.room_code || t.room}</strong>
             <span style="color:#28a745;">+R$ ${t.amount.toFixed(2)}</span>
           </div>
           <div style="color:#888;font-size:12px;margin-top:5px;">
-            ${new Date(t.timestamp).toLocaleString('pt-BR')}
+            ${new Date(t.created_at || t.timestamp).toLocaleString('pt-BR')}
           </div>
         </div>
       `).join('')
@@ -341,9 +345,10 @@ function loadAdminData() {
 // 🔥 TOGGLE MONETIZAÇÃO
 // ============================================
 function toggleMonetization() {
-  if (!sessionId) {
-    const saved = localStorage.getItem('adminSessionId')
-    if (saved) sessionId = saved
+  // ✅ CORRIGIDO: adminToken em vez de sessionId
+  if (!adminToken) {
+    const saved = localStorage.getItem('adminToken')
+    if (saved) adminToken = saved
     else return showMessage('dashboardMessage', 'Faça login novamente!', 'error')
   }
   
@@ -353,11 +358,12 @@ function toggleMonetization() {
   
   console.log('🔧 Toggle monetização:', newState)
   
+  // ✅ CORRIGIDO: token em vez de sessionId
   fetch('/api/admin/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
-      sessionId, 
+      token: adminToken, 
       monetizationEnabled: newState 
     })
   })
@@ -374,7 +380,6 @@ function toggleMonetization() {
       )
     } else {
       showMessage('dashboardMessage', 'Erro: ' + data.error, 'error')
-      // Reverte o toggle se deu erro
       toggle.classList.toggle('active')
     }
   })
@@ -389,9 +394,10 @@ function toggleMonetization() {
 // 🔥 INIT
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('adminSessionId')
+  // ✅ CORRIGIDO: adminToken em vez de adminSessionId
+  const saved = localStorage.getItem('adminToken')
   if (saved) {
-    sessionId = saved
+    adminToken = saved
     showScreen('dashboard-screen')
     loadAdminData()
   }
@@ -399,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Auto-refresh a cada 10 segundos
 setInterval(() => {
-  if (sessionId) loadAdminData()
+  if (adminToken) loadAdminData()
 }, 10000)
 </script>
 </body>

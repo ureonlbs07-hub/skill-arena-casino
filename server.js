@@ -170,9 +170,12 @@ io.on('connection', (socket) => {
       [room.guest_id]: deck.slice(7, 14)
     }
     rooms[code].board = []
-    rooms[code].turn = room.host_id
+    rooms[code].turn = room.host_id  // ← CORRIGIR PARA: rooms[code].host
 
     console.log('🎮 Jogo iniciado:', code)
+    console.log('🎮 Turno inicial:', rooms[code].turn)
+    console.log('🎮 Host:', rooms[code].host)
+    console.log('🎮 Guest:', rooms[code].guest)
 
     io.to(room.host_id).emit('gameStart', {
       hand: rooms[code].hands[room.host_id],
@@ -241,7 +244,9 @@ io.on('connection', (socket) => {
       return
     }
 
-    room.turn = room.turn === room.host_id ? room.guest_id : room.host_id
+    // ✅ CORRIGIDO: Usar room.host e room.guest
+    room.turn = room.turn === room.host ? room.guest : room.host
+    console.log('🎴 Jogada realizada! Próximo turno:', room.turn)
 
     socket.emit('tilePlayed', {
       hand: room.hands[socket.id],
@@ -274,7 +279,8 @@ io.on('connection', (socket) => {
   socket.on('passTurn', ({ code }) => {
     const room = rooms[code]
     if (!room || room.turn !== socket.id) return
-    room.turn = room.turn === room.host_id ? room.guest_id : room.host_id
+    room.turn = room.turn === room.host ? room.guest : room.host
+    console.log('⏭️ Turno passado! Próximo:', room.turn)
     io.emit('update', { board: room.board, turn: room.turn, deckCount: room.deck.length })
   })
 

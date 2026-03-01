@@ -138,22 +138,23 @@ io.on('connection', (socket) => {
     } else {
       await paymentService.markRoomPaid(code, 'guest')
       rooms[code].guestPaid = true
-      io.to(room.host_id).emit('guestJoined', { code, guestId: socket.id })
-      io.to(room.host_id).emit('bothPaid', { roomId: code })
+      io.to(rooms[code].host).emit('guestJoined', { code, guestId: socket.id })
+      io.to(rooms[code].host).emit('bothPaid', { roomId: code })
       socket.emit('roomJoined', { code })
     }
     sendRoomList()
   })
 
+  // ✅ STARTGAME CORRIGIDO (USAR rooms[code], NÃO gameService.getRoom)
   socket.on('startGame', async (code) => {
-    const room = await gameService.getRoom(code)
-    if (!room) return
-    if (room.host_id !== socket.id) return socket.emit('error', { message: 'Apenas host pode iniciar' })
-    if (!room.guest_id) return socket.emit('error', { message: 'Aguarde o convidado' })
+    const room = rooms[code]
+    if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
+    if (room.host !== socket.id) return socket.emit('error', { message: 'Apenas host pode iniciar' })
+    if (!room.guest) return socket.emit('error', { message: 'Aguarde o convidado' })
     
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
-      if (!room.host_paid || !room.guest_paid) {
+      if (!room.hostPaid || !room.guestPaid) {
         return socket.emit('error', { message: 'Ambos devem pagar!' })
       }
     }
@@ -166,29 +167,29 @@ io.on('connection', (socket) => {
     const deck = generateDeck()
     rooms[code].deck = deck.slice(14)
     rooms[code].hands = {
-      [room.host_id]: deck.slice(0, 7),
-      [room.guest_id]: deck.slice(7, 14)
+      [room.host]: deck.slice(0, 7),
+      [room.guest]: deck.slice(7, 14)
     }
     rooms[code].board = []
-    rooms[code].turn = room.host_id  // ← CORRIGIR PARA: rooms[code].host
+    rooms[code].turn = room.host
 
     console.log('🎮 Jogo iniciado:', code)
     console.log('🎮 Turno inicial:', rooms[code].turn)
     console.log('🎮 Host:', rooms[code].host)
     console.log('🎮 Guest:', rooms[code].guest)
 
-    io.to(room.host_id).emit('gameStart', {
-      hand: rooms[code].hands[room.host_id],
+    io.to(room.host).emit('gameStart', {
+      hand: rooms[code].hands[room.host],
       isHost: true,
       deckCount: rooms[code].deck.length,
-      opponent: users[room.guest_id]?.username || 'Oponente'
+      opponent: users[room.guest]?.username || 'Oponente'
     })
 
-    io.to(room.guest_id).emit('gameStart', {
-      hand: rooms[code].hands[room.guest_id],
+    io.to(room.guest).emit('gameStart', {
+      hand: rooms[code].hands[room.guest],
       isHost: false,
       deckCount: rooms[code].deck.length,
-      opponent: users[room.host_id]?.username || 'Oponente'
+      opponent: users[room.host]?.username || 'Oponente'
     })
 
     io.emit('update', {
@@ -244,7 +245,6 @@ io.on('connection', (socket) => {
       return
     }
 
-    // ✅ CORRIGIDO: Usar room.host e room.guest
     room.turn = room.turn === room.host ? room.guest : room.host
     console.log('🎴 Jogada realizada! Próximo turno:', room.turn)
 
@@ -312,7 +312,6 @@ function sendRoomList() {
 // ============================================
 const PORT = process.env.PORT || 3000
 
-// Inicializa banco ANTES de iniciar o servidor
 initDatabase().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log('============================================')

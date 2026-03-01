@@ -3,29 +3,24 @@ const db = require('../../config/database')
 class AdminService {
   async updateSetting(key, value) {
     try {
-      console.log('🔧 updateSetting chamado:', { key, value })
-      
       const checkResult = await db.query(
         `SELECT * FROM settings WHERE key = $1`,
         [key]
       )
-      
-      console.log('📊 Setting encontrada:', checkResult.rows)
       
       if (checkResult.rows.length > 0) {
         await db.query(
           `UPDATE settings SET value = $1 WHERE key = $2`,
           [value, key]
         )
-        console.log('✅ UPDATE realizado')
       } else {
         await db.query(
           `INSERT INTO settings (key, value) VALUES ($1, $2)`,
           [key, value]
         )
-        console.log('✅ INSERT realizado')
       }
       
+      console.log(`✅ Setting atualizada: ${key} = ${value}`)
       return true
     } catch (error) {
       console.error('❌ Erro updateSetting:', error)
@@ -35,40 +30,22 @@ class AdminService {
 
   async getAllSettings() {
     try {
-      console.log('🔧 getAllSettings chamado')
-      
       const result = await db.query(`SELECT * FROM settings`)
       
-      console.log('📊 Todas as settings:', result.rows)
-      console.log('📊 Colunas:', result.fields)
-      
-      const settings = {}
-      result.rows.forEach(row => {
-        // ✅ Tenta diferentes nomes de coluna
-        const key = row.key || row.setting_key || row.name
-        const value = row.value || row.setting_value || row.val
-        if (key) {
-          settings[key] = value
-        }
-      })
-      
-      console.log('📊 Settings processadas:', settings)
+      // ✅ CORRIGIDO: Usar reduce para criar objeto limpo
+      const settings = result.rows.reduce((acc, row) => {
+        acc[row.key] = row.value
+        return acc
+      }, {})
       
       // Valores padrão
-      if (settings.monetization_enabled === undefined) {
-        settings.monetization_enabled = 'false'
+      return {
+        monetization_enabled: settings.monetization_enabled || 'false',
+        entry_fee: settings.entry_fee || '10',
+        prize: settings.prize || '17',
+        house_fee: settings.house_fee || '3',
+        ...settings
       }
-      if (settings.entry_fee === undefined) {
-        settings.entry_fee = '10'
-      }
-      if (settings.prize === undefined) {
-        settings.prize = '17'
-      }
-      if (settings.house_fee === undefined) {
-        settings.house_fee = '3'
-      }
-      
-      return settings
     } catch (error) {
       console.error('❌ Erro getAllSettings:', error)
       return {

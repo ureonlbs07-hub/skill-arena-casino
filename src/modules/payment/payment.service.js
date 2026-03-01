@@ -1,27 +1,31 @@
 const db = require('../../config/database')
+const { v4: uuidv4 } = require('uuid')
 
 class PaymentService {
-  // ✅ SIMPLIFICADO: Cria transação sem Mercado Pago
   async createTransaction(data) {
     const { roomId, userId, amount, playerType } = data
     
+    // ✅ Gera UUID para o id
+    const transactionId = uuidv4()
+    
     const result = await db.query(
-      `INSERT INTO transactions (room_code, user_id, amount, type, status) 
-       VALUES ($1, $2, $3, $4, 'pending') 
+      `INSERT INTO transactions (id, user_id, room_code, amount, type, status) 
+       VALUES ($1, $2, $3, $4, $5, 'pending') 
        RETURNING *`,
-      [roomId, userId, amount, 'entry']
+      [transactionId, userId, roomId, amount, 'entry']
     )
+    
+    console.log('✅ Transação criada:', result.rows[0].id)
     
     return {
       success: true,
       transactionId: result.rows[0].id,
-      pixKey: 'SUA_CHAVE_PIX_AQUI',  // ← Sua chave PIX fixa
-      pixCode: '00020126580014BR.GOV.BCB.PIX... (seu código PIX copia e cola)',
+      pixKey: 'SUA_CHAVE_PIX_AQUI',
+      pixCode: '00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2',
       amount: amount
     }
   }
 
-  // ✅ SIMPLIFICADO: Apenas marca como pago
   async markRoomPaid(roomCode, playerType) {
     const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
     await db.query(
@@ -45,17 +49,17 @@ class PaymentService {
   }
 
   async recordHouseFee(roomCode, amount) {
+    const transactionId = uuidv4()
     await db.query(
-      `INSERT INTO transactions (room_code, amount, type, status) 
-       VALUES ($1, $2, 'house_fee', 'completed')`,
-      [roomCode, amount]
+      `INSERT INTO transactions (id, room_code, amount, type, status) 
+       VALUES ($1, $2, $3, 'house_fee', 'completed')`,
+      [transactionId, roomCode, amount]
     )
   }
 
-  // ✅ NOVO: Admin confirma pagamento manual
   async confirmPayment(transactionId) {
     await db.query(
-      `UPDATE transactions SET status = 'completed' WHERE id = $1`,
+      `UPDATE transactions SET status = 'completed', paid_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [transactionId]
     )
     
@@ -65,10 +69,16 @@ class PaymentService {
     )
     
     if (result.rows.length > 0) {
-      const { room_code, user_id } = result.rows[0]
-      // Determina se é host ou guest pelo primeiro a pagar
-      await this.markRoomPaid(room_code, 'host')  // Simplificado
+      const { room_code } = result.rows[0]
+      await this.markRoomPaid(room_code, 'host')
     }
+  }
+
+  async getPendingPayments() {
+    const result = await db.query(
+      `SELECT * FROM transactions WHERE status = 'pending' ORDER BY created_at DESC`
+    )
+    return result.rows
   }
 }
 

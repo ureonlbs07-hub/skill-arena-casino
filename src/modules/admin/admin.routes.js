@@ -5,7 +5,7 @@ const paymentService = require('../payment/payment.service')
 const db = require('../../config/database')
 
 // ============================================
-// 🔥 LOGIN (Gera token simples)
+// 🔥 LOGIN
 // ============================================
 router.post('/login', (req, res) => {
   const { password } = req.body
@@ -42,7 +42,7 @@ router.get('/data', async (req, res) => {
 })
 
 // ============================================
-// 🔥 SETTINGS
+// 🔥 SETTINGS (GET)
 // ============================================
 router.get('/settings', async (req, res) => {
   const settings = await adminService.getAllSettings()
@@ -54,18 +54,24 @@ router.get('/settings', async (req, res) => {
   })
 })
 
-// ✅ CORRIGIDO: Verificar token em vez de sessão em memória
+// ============================================
+// 🔥 SETTINGS (POST) - ✅ CORRIGIDO
+// ============================================
 router.post('/settings', async (req, res) => {
   try {
     const { token, monetizationEnabled } = req.body
     
-    // ✅ Verificar se token existe (básico)
+    console.log('🔧 /api/admin/settings recebido:', { token, monetizationEnabled })
+    
+    // ✅ Apenas verifica se token foi enviado (sem validação complexa)
     if (!token) {
-      return res.status(401).json({ success: false, error: 'Token não enviado' })
+      return res.status(401).json({ success: false, error: 'Não autorizado' })
     }
     
-    // ✅ Atualizar setting
+    // ✅ Atualizar setting no banco
     await adminService.updateSetting('monetization_enabled', monetizationEnabled ? 'true' : 'false')
+    
+    console.log('✅ Monetização atualizada:', monetizationEnabled)
     
     res.json({ success: true, settings: { monetizationEnabled } })
   } catch (error) {

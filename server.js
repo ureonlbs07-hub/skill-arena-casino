@@ -110,6 +110,7 @@ app.post('/api/confirm-payment', async (req, res) => {
         rooms[roomCode].guestPaid = true
       }
       console.log('✅ rooms[' + roomCode + '] atualizado em memória')
+      console.log('📊 hostPaid:', rooms[roomCode].hostPaid, 'guestPaid:', rooms[roomCode].guestPaid)
     }
     
     const room = rooms[roomCode]
@@ -177,7 +178,7 @@ io.on('connection', (socket) => {
     const room = await gameService.createRoom(socket.id)
     rooms[room.code] = { 
       code: room.code, 
-      host: room.hostId, 
+      host: socket.id, 
       guest: null,
       hostPaid: false, 
       guestPaid: false, 
@@ -189,6 +190,7 @@ io.on('connection', (socket) => {
     }
     
     console.log('🏠 Sala criada:', room.code)
+    console.log('📊 Host socket.id:', socket.id)
     
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
@@ -217,7 +219,7 @@ io.on('connection', (socket) => {
     rooms[code].guest = socket.id
     rooms[code].guest_id = socket.id
     
-    console.log('👤 Guest entrou:', code)
+    console.log('👤 Guest entrou:', code, 'Socket:', socket.id)
 
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {

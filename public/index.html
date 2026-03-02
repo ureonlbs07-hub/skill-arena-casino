@@ -136,8 +136,10 @@ let currentTransactionId = null, paymentCheckInterval = null, paymentData = null
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
+console.log('🎮 DOMINÓ INICIADO - Socket ID:', socket.id)
+
 function showScreen(id) {
-  console.log('🖥️ showScreen:', id, 'room:', room, 'isHost:', isHost)
+  console.log('🖥️ showScreen:', id, 'room:', room, 'isHost:', isHost, 'myId:', myId)
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
   
@@ -191,14 +193,14 @@ socket.on('registered', (data) => {
 })
 
 function createRoom() {
-  console.log('🏠 Criando sala...')
+  console.log('🏠 Criando sala... myId:', myId)
   socket.emit('createRoom')
 }
 
 socket.on('roomCreated', (data) => {
   room = data.code
   isHost = true
-  console.log('✅ Sala criada:', room, 'isHost:', isHost)
+  console.log('✅ Sala criada:', room, 'isHost:', isHost, 'myId:', myId)
   document.getElementById('myRoomCode').innerText = 'Sua sala: ' + room
   showScreen('wait-screen')
   document.getElementById('waitMessage').innerText = '👑 Aguardando...'
@@ -210,7 +212,7 @@ socket.on('paymentRequired', (data) => {
   currentTransactionId = null
   
   isHost = true
-  console.log('👑 isHost definido como TRUE')
+  console.log('👑 isHost definido como TRUE - paymentRequired')
   
   if (data.roomId) { 
     room = data.roomId
@@ -280,38 +282,45 @@ socket.on('roomList', (rooms) => {
   })
 })
 
-function joinRoom(code) { socket.emit('joinRoom', code) }
+function joinRoom(code) { 
+  console.log('🚪 Entrando na sala:', code, 'myId:', myId)
+  socket.emit('joinRoom', code) 
+}
 
 socket.on('roomJoined', (data) => {
   room = data.code
   isHost = false
-  console.log('✅ Entrou na sala:', room, 'isHost:', isHost)
+  console.log('✅ Entrou na sala:', room, 'isHost:', isHost, 'myId:', myId)
   showScreen('wait-screen')
   document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
   document.getElementById('startBtn').classList.add('hidden')
 })
 
-// ✅ CORRIGIDO: bothPaid só libera botão para HOST
+// ✅ CORRIGIDO: bothPaid SÓ libera botão para HOST
 socket.on('bothPaid', (data) => {
-  console.log('📩 bothPaid recebido:', data, 'isHost:', isHost)
-  if (isHost) {
+  console.log('📩 bothPaid recebido:', data, 'isHost:', isHost, 'myId:', myId, 'room:', room)
+  
+  // ✅ VERIFICAÇÃO DUPLA: isHost E room
+  if (isHost === true && room) {
     console.log('✅ HOST recebeu bothPaid, liberando botão!')
     document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
     document.getElementById('startBtn').classList.remove('hidden')
   } else {
-    console.log('⏳ Guest recebeu bothPaid, aguardando host...')
+    console.log('⏳ Guest ou não-host recebeu bothPaid, aguardando host...')
     document.getElementById('waitMessage').innerText = '🎲 Aguardando host iniciar...'
+    document.getElementById('startBtn').classList.add('hidden')
   }
 })
 
 function startGame() {
+  console.log('🚀 startGame chamado - room:', room, 'isHost:', isHost)
   if (!room) { alert('Erro: Sala não identificada!'); return }
+  if (!isHost) { alert('Erro: Apenas o host pode iniciar!'); return }
   socket.emit('startGame', room)
 }
 
-// ✅ CORRIGIDO: gameStart agora renderiza as mãos
 socket.on('gameStart', (data) => {
-  console.log('🎮 gameStart recebido:', data)
+  console.log('🎮 gameStart recebido:', data, 'isHost:', isHost)
   hand = data.hand || []
   deck = data.deckCount || 14
   isHost = data.isHost || false
@@ -321,13 +330,10 @@ socket.on('gameStart', (data) => {
   console.log('🎮 isHost:', isHost)
   
   showScreen('game-screen')
-  
-  // ✅ RENDERIZAR MÃO
   renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
   
-  // ✅ Atualizar turno
   if (isHost) {
     document.getElementById('turn').innerText = '🎮 Sua vez!'
     document.getElementById('turn').classList.add('active')
@@ -393,7 +399,6 @@ function handleDrag(e) { if (!myTurn) return; draggedTile = { v1: parseInt(e.tar
 function buyTile() { if (myTurn && room) { socket.emit('buyTile', { code: room }) } }
 function passTurn() { if (myTurn && room) { socket.emit('passTurn', { code: room }) } }
 
-// ✅ RENDERIZAR MÃO
 function renderHand(h) {
   console.log('🎴 renderHand:', h)
   if (!h || !Array.isArray(h) || h.length === 0) {

@@ -413,7 +413,6 @@
     </div>
     
     <div id="pixQRContainer" style="text-align:center;">
-      <!-- ✅ QR Code FIXO (substitua pelo seu) -->
       <img id="pixQRCode" src="/pix-qr-code.png" alt="QR Code PIX">
     </div>
     
@@ -421,7 +420,6 @@
       📱 Escaneie o QR Code ou copie o código abaixo
     </p>
     
-    <!-- ✅ PIX Copia e Cola FIXO -->
     <p id="pixCode" onclick="copyPixCode()">📋 Toque para copiar</p>
     
     <p id="paymentStatus">⏳ Aguardando pagamento...</p>
@@ -486,8 +484,8 @@ let currentTransactionId = null
 let paymentCheckInterval = null
 let paymentData = null
 
-// ✅ SEU PIX COPIA E COLA AQUI (substitua pelo seu)
-const PIX_COPY_PASTE = "00020126580014BR.GOV.BCB.PIX0136SEU_PIX_AQUI..."
+// ✅ SEU PIX COPIA E COLA AQUI
+const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
 // ============================================
 // 🔥 MANTER TELA LIGADA
@@ -570,7 +568,6 @@ function updateScrollArrows() {
 async function createPayment(data) {
   paymentData = data
   
-  // ✅ Cria transação no banco (sem Mercado Pago)
   try {
     const res = await fetch('/api/payment/create', {
       method: 'POST',
@@ -581,9 +578,7 @@ async function createPayment(data) {
     
     if (result.success) {
       currentTransactionId = result.transactionId
-      // ✅ Usa QR Code fixo
       document.getElementById('pixQRCode').src = '/pix-qr-code.png'
-      // ✅ Usa PIX Copia e Cola fixo
       document.getElementById('pixCode').innerText = PIX_COPY_PASTE
       document.getElementById('paymentStatus').innerText = '⏳ Aguardando pagamento...'
       document.getElementById('paymentStatus').style.color = '#ffd700'
@@ -595,7 +590,7 @@ async function createPayment(data) {
   showScreen('payment-screen')
 }
 
-// ✅ NOVO: Botão "Já Paguei" apenas notifica
+// ✅ CORRIGIDO: NÃO libera a sala imediatamente!
 function confirmPaymentManual() {
   if (!currentTransactionId) return
   
@@ -609,15 +604,42 @@ function confirmPaymentManual() {
     playerType: paymentData?.playerType
   })
   
-  // ✅ Entra na sala mesmo sem confirmação (admin confirma depois)
-  setTimeout(() => {
-    showScreen('wait-screen')
-    if (paymentData?.playerType === 'host') {
-      document.getElementById('waitMessage').innerText = '👑 Aguardando convidado...'
-    } else {
-      document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
+  // ✅ Inicia polling para verificar se admin confirmou
+  startAdminConfirmationCheck()
+  
+  // ❌ NÃO vai para wait-screen! Fica na tela de pagamento!
+}
+
+// ✅ NOVA FUNÇÃO: Verifica se admin confirmou (a cada 5 segundos)
+function startAdminConfirmationCheck() {
+  paymentCheckInterval = setInterval(async () => {
+    if (!currentTransactionId) return
+    
+    try {
+      const res = await fetch(`/api/payment/status/${currentTransactionId}`)
+      const result = await res.json()
+      
+      console.log('📊 Status do pagamento:', result)
+      
+      // ✅ SÓ libera se status for 'completed'
+      if (result.status === 'completed') {
+        clearInterval(paymentCheckInterval)
+        document.getElementById('paymentStatus').innerText = '✅ Pagamento confirmado!'
+        document.getElementById('paymentStatus').style.color = '#28a745'
+        
+        setTimeout(() => {
+          showScreen('wait-screen')
+          if (paymentData?.playerType === 'host') {
+            document.getElementById('waitMessage').innerText = '👑 Aguardando convidado...'
+          } else {
+            document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
+          }
+        }, 2000)
+      }
+    } catch (error) {
+      console.error('Erro ao verificar:', error)
     }
-  }, 2000)
+  }, 5000)
 }
 
 function copyPixCode() {
@@ -626,6 +648,9 @@ function copyPixCode() {
 }
 
 function cancelPayment() {
+  if (paymentCheckInterval) {
+    clearInterval(paymentCheckInterval)
+  }
   currentTransactionId = null
   paymentData = null
   showScreen('menu-screen')

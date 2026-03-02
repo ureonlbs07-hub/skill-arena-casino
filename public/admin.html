@@ -191,7 +191,7 @@
       </div>
     </div>
 
-    <!-- ✅ PAGAMENTOS PENDENTES (NOVO) -->
+    <!-- ✅ PAGAMENTOS PENDENTES -->
     <h2 style="margin-top:30px;">⏳ Pagamentos Pendentes</h2>
     <div id="pendingPaymentsList">
       <p style="text-align:center;color:#888;padding:20px;">Nenhum pagamento pendente</p>
@@ -293,21 +293,15 @@ function loadAdminData() {
   .then(data => {
     if (!data) return
     
-    // Saldo da casa
     document.getElementById('houseBalance').innerText = 
       `R$ ${data.houseBalance.toFixed(2).replace('.', ',')}`
     
-    // Salas ativas
     const activeRooms = data.rooms.filter(r => r.started).length
     document.getElementById('activeRooms').innerText = activeRooms
-    
-    // Transações
     document.getElementById('totalTransactions').innerText = data.transactions.length
     
-    // Atualizar toggle
     updateToggleVisual(data.settings.monetization_enabled)
     
-    // Lista de transações
     const list = document.getElementById('transactionsList')
     if (data.transactions.length === 0) {
       list.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhuma transação registrada</p>'
@@ -316,7 +310,7 @@ function loadAdminData() {
         <div class="transaction-item">
           <div style="display:flex;justify-content:space-between;">
             <strong>Sala: ${t.room_code || t.room}</strong>
-            <span style="color:#28a745;">+R$ ${t.amount.toFixed(2)}</span>
+            <span style="color:#28a745;">+R$ ${parseFloat(t.amount).toFixed(2)}</span>
           </div>
           <div style="color:#888;font-size:12px;margin-top:5px;">
             ${new Date(t.created_at || t.timestamp).toLocaleString('pt-BR')}
@@ -332,11 +326,9 @@ function loadAdminData() {
     showMessage('dashboardMessage', 'Erro ao carregar dados', 'error')
   })
 
-  // ✅ Carrega pagamentos pendentes
   loadPendingPayments()
 }
 
-// ✅ Atualiza visual do toggle
 function updateToggleVisual(monetizationEnabled) {
   const toggle = document.getElementById('monetizationToggle')
   const status = document.getElementById('monetizationStatus')
@@ -354,9 +346,6 @@ function updateToggleVisual(monetizationEnabled) {
   }
 }
 
-// ============================================
-// 🔥 TOGGLE MONETIZAÇÃO
-// ============================================
 function toggleMonetization() {
   if (!adminToken) {
     const saved = localStorage.getItem('adminToken')
@@ -398,38 +387,52 @@ function toggleMonetization() {
 }
 
 // ============================================
-// 🔥 PAGAMENTOS PENDENTES (NOVO)
+// 🔥 PAGAMENTOS PENDENTES
 // ============================================
 async function loadPendingPayments() {
   try {
-    console.log('🔧 loadPendingPayments chamado')
-    const res = await fetch('/api/payment/pending')
-    const data = await res.json()
+    console.log('🔧 loadPendingPayments INICIADO')
     
+    const res = await fetch('/api/payment/pending')
+    console.log('📡 Status da resposta:', res.status)
+    
+    const data = await res.json()
     console.log('📊 Dados recebidos:', data)
     
     const list = document.getElementById('pendingPaymentsList')
-    if (!data.transactions || data.transactions.length === 0) {
+    
+    if (!data.transactions) {
+      console.error('❌ data.transactions não existe!')
+      list.innerHTML = '<p style="text-align:center;color:#dc3545;padding:20px;">Erro: dados inválidos</p>'
+      return
+    }
+    
+    if (data.transactions.length === 0) {
       list.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhum pagamento pendente</p>'
     } else {
-      list.innerHTML = data.transactions.map(t => `
+      list.innerHTML = data.transactions.map(t => {
+        const amount = parseFloat(t.amount) || 0
+        const createdAt = t.created_at ? new Date(t.created_at).toLocaleString('pt-BR') : 'Data inválida'
+        
+        return `
         <div class="transaction-item">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
-              <strong>Sala: ${t.room_code}</strong>
+              <strong>Sala: ${t.room_code || 'N/A'}</strong>
               <span style="background:#ffc107;color:#000;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;margin-left:8px;">PENDENTE</span><br>
-              <small>R$ ${t.amount.toFixed(2)} - ${new Date(t.created_at).toLocaleString('pt-BR')}</small>
+              <small>R$ ${amount.toFixed(2)} - ${createdAt}</small>
             </div>
             <button class="btn-green" style="width:auto;padding:8px 16px;" 
               onclick="confirmPayment('${t.id}')">✅ Confirmar</button>
           </div>
         </div>
-      `).join('')
+      `
+      }).join('')
     }
   } catch (error) {
-    console.error('Erro ao carregar pendentes:', error)
+    console.error('❌ ERRO loadPendingPayments:', error)
     document.getElementById('pendingPaymentsList').innerHTML = 
-      '<p style="text-align:center;color:#dc3545;padding:20px;">Erro ao carregar</p>'
+      `<p style="text-align:center;color:#dc3545;padding:20px;">Erro: ${error.message}</p>`
   }
 }
 
@@ -467,7 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 })
 
-// Auto-refresh a cada 10 segundos
 setInterval(() => {
   if (adminToken) loadAdminData()
 }, 10000)

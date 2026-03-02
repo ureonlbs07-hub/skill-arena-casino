@@ -30,9 +30,10 @@ let rooms = {}
 let users = {}
 let adminSessions = {}
 
-// ✅ ROTAS ESPECÍFICAS PRIMEIRO
+// ✅ ROTAS
 app.use('/api/payment', paymentRoutes)
 app.use('/api/game', gameRoutes)
+app.use('/api/admin', adminRoutes)
 
 // ✅ Rota para verificar status da sala (POLLING)
 app.get('/api/room/status/:code', async (req, res) => {
@@ -65,25 +66,22 @@ app.get('/api/room/status/:code', async (req, res) => {
   }
 })
 
-// ✅ Rota para admin confirmar pagamento (ANTES de app.use('/api/admin'))
-app.post('/api/admin/confirm-payment', async (req, res) => {
+// ✅ Rota para admin confirmar pagamento
+app.post('/api/confirm-payment', async (req, res) => {
   try {
-    const { transactionId, token } = req.body
+    const { transactionId, password } = req.body
     
     console.log('💰 Admin confirmando pagamento:', transactionId)
-    console.log('📡 Token recebido:', token ? 'presente' : 'ausente')
-    console.log('📡 Admin sessions:', Object.keys(adminSessions))
     
-    // Verificar token de admin
-    if (!token || !adminSessions[token]) {
-      console.log('❌ Token inválido:', token)
+    if (password !== 'admin123') {
+      console.log('❌ Password inválido')
       return res.status(401).json({ success: false, error: 'Não autorizado' })
     }
     
-    // Confirmar no banco
+    console.log('✅ Admin autorizado!')
+    
     await paymentService.confirmPayment(transactionId)
     
-    // Buscar dados da transação
     const txResult = await db.query(
       `SELECT room_code, player_type FROM transactions WHERE id = $1`,
       [transactionId]
@@ -98,7 +96,6 @@ app.post('/api/admin/confirm-payment', async (req, res) => {
     
     console.log('📊 Sala:', roomCode, 'Player Type:', playerType)
     
-    // ✅ ATUALIZAR BANCO
     const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
     await db.query(
       `UPDATE rooms SET ${column} = TRUE WHERE code = $1`,
@@ -106,7 +103,6 @@ app.post('/api/admin/confirm-payment', async (req, res) => {
     )
     console.log('✅ rooms.' + column + ' atualizado para TRUE (banco)')
     
-    // ✅ ATUALIZAR MEMÓRIA
     if (rooms[roomCode]) {
       if (playerType === 'host') {
         rooms[roomCode].hostPaid = true
@@ -114,18 +110,12 @@ app.post('/api/admin/confirm-payment', async (req, res) => {
         rooms[roomCode].guestPaid = true
       }
       console.log('✅ rooms[' + roomCode + '] atualizado em memória')
-      console.log('📊 hostPaid:', rooms[roomCode].hostPaid, 'guestPaid:', rooms[roomCode].guestPaid)
-    } else {
-      console.log('⚠️ Sala não encontrada em memória:', roomCode)
     }
     
-    // ✅ VERIFICAR SE AMBOS PAGARAM
     const room = rooms[roomCode]
     if (room && room.hostPaid && room.guestPaid && room.host) {
       console.log('✅ AMBOS PAGARAM! Emitindo bothPaid para:', room.host)
       io.to(room.host).emit('bothPaid', { roomId: roomCode })
-    } else {
-      console.log('⏳ Aguardando ambos pagarem... hostPaid:', room?.hostPaid, 'guestPaid:', room?.guestPaid)
     }
     
     res.json({ success: true })
@@ -134,9 +124,6 @@ app.post('/api/admin/confirm-payment', async (req, res) => {
     res.status(500).json({ success: false, error: error.message })
   }
 })
-
-// ✅ ROTAS GENÉRICAS DEPOIS
-app.use('/api/admin', adminRoutes)
 
 app.get('/api/monetization-status', async (req, res) => {
   const settings = await adminService.getAllSettings()

@@ -503,15 +503,14 @@ async function confirmPayment(transactionId) {
   }
   
   try {
-    console.log('📡 Enviando confirmação para /api/payment/confirm...')
-    
-    const res = await fetch('/api/payment/confirm', {
+    const res = await fetch('/api/admin/confirm-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transactionId })
+      body: JSON.stringify({ 
+        transactionId,
+        token: adminToken 
+      })
     })
-    
-    console.log('📡 Resposta recebida:', res.status)
     
     const result = await res.json()
     console.log('📊 Resultado:', result)

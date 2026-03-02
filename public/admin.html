@@ -112,6 +112,61 @@
     }
     .transaction-item:last-child { border-bottom: none; }
     
+    .room-group {
+      background: rgba(255, 215, 0, 0.1);
+      border: 1px solid #ffd700;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 10px 0;
+    }
+    .room-group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+    }
+    .room-code {
+      font-size: 1.2em;
+      font-weight: bold;
+      color: #ffd700;
+    }
+    .payment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .payment-info {
+      flex: 1;
+    }
+    .payment-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .payment-actions button {
+      width: auto;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .player-type {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+    .player-type.host { background: #007bff; color: white; }
+    .player-type.guest { background: #28a745; color: white; }
+    .pending-badge {
+      background: #ffc107;
+      color: #000;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    
     .dev-signature {
       text-align: center;
       margin-top: 40px;
@@ -129,20 +184,10 @@
     }
     .message.success { background: #28a745; }
     .message.error { background: #dc3545; }
-
-    .pending-badge {
-      background: #ffc107;
-      color: #000;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: bold;
-    }
   </style>
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
 <div id="login-screen" class="screen active">
   <div class="card">
     <h1>🔐 Admin Login</h1>
@@ -152,7 +197,6 @@
   </div>
 </div>
 
-<!-- DASHBOARD SCREEN -->
 <div id="dashboard-screen" class="screen">
   <div class="dashboard">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
@@ -160,7 +204,6 @@
       <button class="btn-red" style="width:auto;padding:10px 20px;" onclick="adminLogout()">Sair</button>
     </div>
     
-    <!-- Monetização -->
     <div class="toggle-container">
       <div>
         <h2>💰 Monetização</h2>
@@ -172,7 +215,6 @@
       </div>
     </div>
     
-    <!-- Stats -->
     <div class="stats-grid">
       <div class="stat-card">
         <h3>🏦 Saldo da Casa</h3>
@@ -191,19 +233,16 @@
       </div>
     </div>
 
-    <!-- ✅ PAGAMENTOS PENDENTES -->
     <h2 style="margin-top:30px;">⏳ Pagamentos Pendentes</h2>
     <div id="pendingPaymentsList">
       <p style="text-align:center;color:#888;padding:20px;">Nenhum pagamento pendente</p>
     </div>
 
-    <!-- Transações -->
     <h2 style="margin-top:30px;">📜 Histórico de Transações</h2>
     <div id="transactionsList">
       <p style="text-align:center;color:#888;padding:20px;">Nenhuma transação registrada</p>
     </div>
     
-    <!-- Botão Atualizar -->
     <button class="btn-blue" onclick="loadAdminData()" style="margin-top:20px;">🔄 Atualizar Dados</button>
     <div id="dashboardMessage"></div>
   </div>
@@ -216,9 +255,6 @@
 <script>
 let adminToken = null
 
-// ============================================
-// 🔥 LOGIN
-// ============================================
 function adminLogin() {
   const password = document.getElementById('adminPassword').value
   if (!password) return showMessage('loginMessage', 'Digite a senha!', 'error')
@@ -256,9 +292,6 @@ function adminLogout() {
   showMessage('loginMessage', '', '')
 }
 
-// ============================================
-// 🔥 DASHBOARD
-// ============================================
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
@@ -386,9 +419,6 @@ function toggleMonetization() {
   })
 }
 
-// ============================================
-// 🔥 PAGAMENTOS PENDENTES
-// ============================================
 async function loadPendingPayments() {
   try {
     console.log('🔧 loadPendingPayments INICIADO')
@@ -410,21 +440,50 @@ async function loadPendingPayments() {
     if (data.transactions.length === 0) {
       list.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhum pagamento pendente</p>'
     } else {
-      list.innerHTML = data.transactions.map(t => {
-        const amount = parseFloat(t.amount) || 0
-        const createdAt = t.created_at ? new Date(t.created_at).toLocaleString('pt-BR') : 'Data inválida'
+      const rooms = {}
+      data.transactions.forEach(t => {
+        if (!rooms[t.room_code]) {
+          rooms[t.room_code] = []
+        }
+        rooms[t.room_code].push(t)
+      })
+      
+      list.innerHTML = Object.keys(rooms).map(roomCode => {
+        const payments = rooms[roomCode]
+        const totalAmount = payments.reduce((sum, t) => sum + parseFloat(t.amount), 0)
+        const createdAt = payments[0].created_at ? new Date(payments[0].created_at).toLocaleString('pt-BR') : 'Data inválida'
         
         return `
-        <div class="transaction-item">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="room-group">
+          <div class="room-group-header">
             <div>
-              <strong>Sala: ${t.room_code || 'N/A'}</strong>
-              <span style="background:#ffc107;color:#000;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;margin-left:8px;">PENDENTE</span><br>
-              <small>R$ ${amount.toFixed(2)} - ${createdAt}</small>
+              <span class="room-code">🎲 Sala: ${roomCode}</span>
+              <span class="pending-badge" style="margin-left:10px;">${payments.length} pagamento(s)</span>
             </div>
-            <button class="btn-green" style="width:auto;padding:8px 16px;" 
-              onclick="confirmPayment('${t.id}')">✅ Confirmar</button>
+            <div style="color:#ffd700;font-weight:bold;">
+              Total: R$ ${totalAmount.toFixed(2)}
+            </div>
           </div>
+          <div style="color:#888;font-size:12px;margin-bottom:10px;">
+            📅 Criado em: ${createdAt}
+          </div>
+          ${payments.map(t => {
+            const amount = parseFloat(t.amount) || 0
+            
+            return `
+            <div class="payment-item">
+              <div class="payment-info">
+                <strong>R$ ${amount.toFixed(2)}</strong>
+                <span class="player-type ${t.player_type === 'host' ? 'host' : 'guest'}">${t.player_type === 'host' ? '👑 Host' : '👤 Convidado'}</span>
+                <span class="pending-badge" style="margin-left:8px;">PENDENTE</span>
+              </div>
+              <div class="payment-actions">
+                <button class="btn-green" onclick="confirmPayment('${t.id}')">✅ Confirmar</button>
+                <button class="btn-red" onclick="cancelPayment('${t.id}')">❌ Cancelar</button>
+              </div>
+            </div>
+          `
+          }).join('')}
         </div>
       `
       }).join('')
@@ -437,17 +496,57 @@ async function loadPendingPayments() {
 }
 
 async function confirmPayment(transactionId) {
+  console.log('💰 confirmPayment CHAMADO:', transactionId)
+  
+  if (!confirm('Tem certeza que deseja CONFIRMAR este pagamento?')) {
+    return
+  }
+  
   try {
-    console.log('💰 Confirmando pagamento:', transactionId)
+    console.log('📡 Enviando confirmação para /api/payment/confirm...')
+    
     const res = await fetch('/api/payment/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transactionId })
     })
+    
+    console.log('📡 Resposta recebida:', res.status)
+    
     const result = await res.json()
+    console.log('📊 Resultado:', result)
     
     if (result.success) {
       showMessage('dashboardMessage', 'Pagamento confirmado!', 'success')
+      loadPendingPayments()
+      loadAdminData()
+    } else {
+      showMessage('dashboardMessage', 'Erro: ' + result.error, 'error')
+    }
+  } catch (error) {
+    console.error('❌ ERRO confirmPayment:', error)
+    showMessage('dashboardMessage', 'Erro de conexão: ' + error.message, 'error')
+  }
+}
+
+async function cancelPayment(transactionId) {
+  console.log('❌ cancelPayment CHAMADO:', transactionId)
+  
+  if (!confirm('Tem certeza que deseja CANCELAR este pagamento?')) {
+    return
+  }
+  
+  try {
+    const res = await fetch('/api/payment/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transactionId })
+    })
+    
+    const result = await res.json()
+    
+    if (result.success) {
+      showMessage('dashboardMessage', 'Pagamento cancelado!', 'success')
       loadPendingPayments()
       loadAdminData()
     } else {
@@ -458,9 +557,6 @@ async function confirmPayment(transactionId) {
   }
 }
 
-// ============================================
-// 🔥 INIT
-// ============================================
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('adminToken')
   if (saved) {

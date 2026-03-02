@@ -4,136 +4,71 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Dominó - Skill Arena</title>
- <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; }
-  .screen { display: none; }
-  .screen.active { display: block; }
-  .card { background: rgba(0,0,0,0.8); border-radius: 15px; padding: 15px; max-width: 400px; margin: 20px auto; }
-  h1 { text-align: center; color: #ffd700; margin-bottom: 15px; }
-  input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 2px solid #ffd700; background: rgba(0,0,0,0.6); color: white; }
-  button { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-  .btn-green { background: #28a745; color: white; }
-  .btn-blue { background: #007bff; color: white; }
-  .btn-red { background: #dc3545; color: white; }
-  .btn-yellow { background: #ffc107; color: black; }
-  .hidden { display: none; }
-  #rooms { list-style: none; }
-  #rooms li { padding: 10px; margin: 5px 0; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: space-between; }
-  .player-bar { display: flex; justify-content: space-between; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px; margin-bottom: 10px; }
-  .deck-pile { width: 45px; height: 65px; background: #2d5a3d; border: 3px dashed #ffd700; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ffd700; font-weight: bold; }
-  #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
-  #turn.active { background: #28a745; }
-  .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 8px; margin: 8px 0; overflow-x: auto; }
-  .board { display: flex; align-items: center; gap: 3px; min-height: 70px; }
-  .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; flex-shrink: 0; background: rgba(255,215,0,0.1); }
-  .drop-zone.hidden { display: none; }
-  
-  /* ✅ PEÇAS DE DOMINÓ - CORRETAS */
-  .domino { 
-    width: 32px; 
-    height: 60px; 
-    background: #f5f5dc; 
-    border-radius: 5px; 
-    display: flex; 
-    flex-direction: column; 
-    border: 2px solid #8b7355; 
-    flex-shrink: 0;
-  }
-  
-  /* ✅ HORIZONTAL - DEITADA */
-  .domino.horizontal { 
-    width: 60px !important; 
-    height: 32px !important; 
-    flex-direction: row !important; 
-  }
-  
-  .domino-face { 
-    flex: 1; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    font-size: 12px;
-    color: #000;
-  }
-  
-  /* ✅ LINHA DIVISÓRIA CORRETA */
-  .domino-face.top { 
-    border-bottom: 2px solid #8b7355; 
-  }
-  
-  .domino.horizontal .domino-face.top { 
-    border-bottom: none !important; 
-    border-right: 2px solid #8b7355 !important; 
-  }
-  
-  .hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; min-height: 70px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 8px; }
-  #action-buttons { display: flex; gap: 8px; justify-content: center; margin: 8px 0; }
-  #action-buttons button { width: auto; padding: 10px 15px; }
-  .dev-signature { text-align: center; margin-top: 20px; color: rgba(255,255,255,0.5); font-size: 11px; }
-  #pixQRCode { max-width: 200px; margin: 15px auto; display: block; }
-  #pixCode { font-family: monospace; font-size: 10px; background: #000; padding: 10px; border-radius: 8px; word-break: break-all; }
-  .payment-info { background: rgba(255,215,0,0.1); border: 1px solid #ffd700; border-radius: 8px; padding: 12px; margin: 15px 0; text-align: center; }
-  .payment-warning { background: rgba(255,193,7,0.2); border: 1px solid #ffc107; border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px; }
-</style>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .card { background: rgba(0,0,0,0.8); border-radius: 15px; padding: 15px; max-width: 400px; margin: 20px auto; }
+    h1 { text-align: center; color: #ffd700; margin-bottom: 15px; }
+    input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 2px solid #ffd700; background: rgba(0,0,0,0.6); color: white; }
+    button { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .btn-green { background: #28a745; color: white; }
+    .btn-blue { background: #007bff; color: white; }
+    .btn-red { background: #dc3545; color: white; }
+    .btn-yellow { background: #ffc107; color: black; }
+    .hidden { display: none; }
+    #rooms { list-style: none; }
+    #rooms li { padding: 10px; margin: 5px 0; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: space-between; }
+    .player-bar { display: flex; justify-content: space-between; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px; margin-bottom: 10px; }
+    .deck-pile { width: 45px; height: 65px; background: #2d5a3d; border: 3px dashed #ffd700; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ffd700; font-weight: bold; }
+    #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
+    #turn.active { background: #28a745; }
+    .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 8px; margin: 8px 0; overflow-x: auto; }
+    .board { display: flex; align-items: center; gap: 3px; min-height: 70px; }
+    .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; flex-shrink: 0; background: rgba(255,215,0,0.1); }
+    .drop-zone.hidden { display: none; }
     
-    /* ✅ PEÇAS DE DOMINÓ */
+    /* ✅ PEÇAS DE DOMINÓ - DENTRO DO STYLE */
     .domino { 
       width: 32px; 
-      height: 55px; 
+      height: 60px; 
       background: #f5f5dc; 
       border-radius: 5px; 
       display: flex; 
       flex-direction: column; 
-      cursor: grab; 
       border: 2px solid #8b7355; 
-      flex-shrink: 0; 
-      touch-action: none;
+      flex-shrink: 0;
     }
     .domino.horizontal { 
-      width: 55px; 
-      height: 32px; 
-      flex-direction: row; 
-    }
-    .domino.dragging { 
-      opacity: 0.5; 
-      transform: scale(1.1); 
+      width: 60px !important; 
+      height: 32px !important; 
+      flex-direction: row !important; 
     }
     .domino-face { 
       flex: 1; 
-      display: grid; 
-      grid-template-columns: repeat(3, 1fr); 
-      grid-template-rows: repeat(3, 1fr); 
-      padding: 2px; 
-      gap: 1px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-size: 12px;
+      color: #000;
     }
     .domino-face.top { 
-      border-bottom: 1px solid #8b7355; 
+      border-bottom: 2px solid #8b7355; 
     }
     .domino.horizontal .domino-face.top { 
-      border-bottom: none; 
-      border-right: 1px solid #8b7355; 
+      border-bottom: none !important; 
+      border-right: 2px solid #8b7355 !important; 
     }
     
-    .pip { background: #000; border-radius: 50%; width: 4px; height: 4px; justify-self: center; align-self: center; display: none; }
-    .v0 .pip { display: none; }
-    .v1 .p5 { display: block; }
-    .v2 .p1, .v2 .p9 { display: block; }
-    .v3 .p1, .v3 .p5, .v3 .p9 { display: block; }
-    .v4 .p1, .v4 .p3, .v4 .p7, .v4 .p9 { display: block; }
-    .v5 .p1, .v5 .p3, .v5 .p5, .v5 .p7, .v5 .p9 { display: block; }
-    .v6 .p1, .v6 .p3, .v6 .p4, .v6 .p6, .v6 .p7, .v6 .p9 { display: block; }
-    .hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; min-height: 65px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 8px; }
+    .hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; min-height: 70px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 8px; }
     #action-buttons { display: flex; gap: 8px; justify-content: center; margin: 8px 0; }
-    #action-buttons button { width: auto; padding: 10px 18px; font-size: 13px; }
-    .dev-signature { position: fixed; bottom: 10px; right: 15px; font-size: 11px; color: rgba(255,255,255,0.35); }
-    .dev-signature strong { color: #ffd700; }
-    #pixQRCode { max-width: 200px; border: 2px solid #ffd700; border-radius: 10px; margin: 15px auto; display: block; }
-    #pixCode { font-family: monospace; font-size: 11px; background: #000; padding: 10px; border-radius: 8px; word-break: break-all; cursor: pointer; text-align: center; }
-    #paymentStatus { text-align: center; color: #ffd700; margin: 15px 0; }
+    #action-buttons button { width: auto; padding: 10px 15px; }
+    .dev-signature { text-align: center; margin-top: 20px; color: rgba(255,255,255,0.5); font-size: 11px; }
+    #pixQRCode { max-width: 200px; margin: 15px auto; display: block; }
+    #pixCode { font-family: monospace; font-size: 10px; background: #000; padding: 10px; border-radius: 8px; word-break: break-all; }
     .payment-info { background: rgba(255,215,0,0.1); border: 1px solid #ffd700; border-radius: 8px; padding: 12px; margin: 15px 0; text-align: center; }
-    .payment-info strong { color: #28a745; font-size: 1.3em; }
-    .payment-warning { background: rgba(255,193,7,0.2); border: 1px solid #ffc107; border-radius: 8px; padding: 10px; margin: 10px 0; text-align: center; font-size: 12px; color: #ffc107; }
+    .payment-warning { background: rgba(255,193,7,0.2); border: 1px solid #ffc107; border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -158,11 +93,11 @@
 
 <div id="payment-screen" class="screen">
   <div class="card">
-    <h1>💰 Pagamento via PIX</h1>
-    <div class="payment-info"><p>Valor:</p><strong>R$ 10,00</strong></div>
-    <div class="payment-warning">⚠️ Após pagar, clique em "✅ Já Paguei" e aguarde o admin.</div>
+    <h1>💰 Pagamento PIX</h1>
+    <div class="payment-info"><strong>R$ 10,00</strong></div>
+    <div class="payment-warning">⚠️ Após pagar, clique em "✅ Já Paguei"</div>
     <img id="pixQRCode" src="/pix-qr-code.png" alt="PIX">
-    <p id="pixCode" onclick="copyPixCode()">📋 Copiar PIX</p>
+    <p id="pixCode" onclick="copyPixCode()">📋 Copiar</p>
     <p id="paymentStatus">⏳ Aguardando...</p>
     <button class="btn-green" onclick="confirmPaymentManual()">✅ Já Paguei</button>
     <button class="btn-red" onclick="cancelPayment()">❌ Cancelar</button>
@@ -189,7 +124,7 @@
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
   <div class="board-container">
-    <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;font-size:14px;">📌 Mesa</h3>
+    <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;">📌 Mesa</h3>
     <div class="board">
       <div class="drop-zone hidden" id="dropLeft">⬅️</div>
       <div id="boardTiles"></div>
@@ -197,7 +132,7 @@
       <div class="drop-zone hidden" id="dropCenter">🎲</div>
     </div>
   </div>
-  <h3 style="text-align:center;color:#ffd700;font-size:14px;">🎮 Sua Mão</h3>
+  <h3 style="text-align:center;color:#ffd700;margin-top:15px;">🎮 Sua Mão</h3>
   <div class="hand" id="hand"></div>
 </div>
 
@@ -205,12 +140,10 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io({ reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 1000 })
-
+const socket = io()
 let room = null, myId = null, myTurn = false, isHost = false, hand = [], deck = 14
 let currentTransactionId = null, paymentCheckInterval = null, paymentData = null, hostCheckInterval = null
 let draggedTile = null, draggedElement = null
-let touchStartX = 0, touchStartY = 0
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
@@ -229,7 +162,7 @@ function startHostPaymentCheck() {
       const result = await res.json()
       if (result.hostPaid && result.guestPaid) {
         clearInterval(hostCheckInterval)
-        document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
+        document.getElementById('waitMessage').innerText = '✅ Ambos pagaram!'
         document.getElementById('startBtn').classList.remove('hidden')
       }
     } catch (e) {}
@@ -242,19 +175,9 @@ function register() {
   socket.emit('register', u)
 }
 
-socket.on('registered', (data) => { 
-  myId = data.id
-  console.log('✅ Registrado:', myId)
-  showScreen('menu-screen')
-})
-
-socket.on('connect', () => {
-  console.log('🔌 Socket conectado:', socket.id)
-})
-
-socket.on('disconnect', () => {
-  console.log('❌ Socket desconectado')
-})
+socket.on('registered', (data) => { myId = data.id; showScreen('menu-screen') })
+socket.on('connect', () => console.log('🔌 Conectado'))
+socket.on('disconnect', () => console.log('❌ Desconectado'))
 
 function createRoom() { socket.emit('createRoom') }
 
@@ -287,7 +210,7 @@ socket.on('roomJoined', (data) => {
 
 socket.on('bothPaid', (data) => {
   if (isHost && room) {
-    document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
+    document.getElementById('waitMessage').innerText = '✅ Ambos pagaram!'
     document.getElementById('startBtn').classList.remove('hidden')
   }
 })
@@ -302,15 +225,10 @@ socket.on('paymentRequired', (data) => {
 async function createPayment(data) {
   paymentData = data
   try {
-    const res = await fetch('/api/payment/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
+    const res = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
     const result = await res.json()
     if (result.success) {
       currentTransactionId = result.transactionId
-      document.getElementById('pixQRCode').src = '/pix-qr-code.png'
       document.getElementById('pixCode').innerText = PIX_COPY_PASTE
     }
   } catch (e) {}
@@ -336,7 +254,7 @@ function startAdminConfirmationCheck() {
         setTimeout(() => {
           showScreen('wait-screen')
           if (!room && paymentData?.roomId) room = paymentData.roomId
-          document.getElementById('waitMessage').innerText = paymentData?.playerType === 'host' ? '👑 Aguardando convidado...' : '🎲 Aguardando host...'
+          document.getElementById('waitMessage').innerText = paymentData?.playerType === 'host' ? '👑 Aguardando...' : '🎲 Aguardando...'
         }, 2000)
       }
     } catch (e) {}
@@ -344,13 +262,7 @@ function startAdminConfirmationCheck() {
 }
 
 function copyPixCode() { navigator.clipboard.writeText(PIX_COPY_PASTE); alert('PIX copiado! ✅') }
-
-function cancelPayment() { 
-  if (paymentCheckInterval) clearInterval(paymentCheckInterval)
-  currentTransactionId = null
-  paymentData = null
-  showScreen('menu-screen')
-}
+function cancelPayment() { if (paymentCheckInterval) clearInterval(paymentCheckInterval); currentTransactionId = null; paymentData = null; showScreen('menu-screen') }
 
 function startGame() {
   if (!room) return alert('Erro!')
@@ -359,28 +271,21 @@ function startGame() {
 }
 
 socket.on('gameStart', (data) => {
-  console.log('🎮 gameStart:', data)
   hand = data.hand || []
   deck = data.deckCount || 14
   isHost = data.isHost || false
-  
   showScreen('game-screen')
   renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
-  
   if (isHost) {
     myTurn = true
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
-    document.getElementById('action-buttons').classList.add('hidden')
     document.getElementById('dropCenter').classList.remove('hidden')
-    document.getElementById('dropLeft').classList.add('hidden')
-    document.getElementById('dropRight').classList.add('hidden')
   } else {
     myTurn = false
     document.getElementById('turn').innerText = '⏳ Oponente...'
-    document.getElementById('turn').classList.remove('active')
     hideZones()
   }
 })
@@ -415,7 +320,6 @@ socket.on('tilePlayed', (data) => {
     checkMoves(data.board)
   } else {
     document.getElementById('turn').innerText = '⏳ Oponente...'
-    document.getElementById('turn').classList.remove('active')
     myTurn = false
     hideZones()
   }
@@ -430,39 +334,12 @@ socket.on('tileBought', (data) => {
   checkMoves(data.board)
 })
 
-socket.on('error', (data) => { 
-  console.log('❌ Erro:', data.message)
-  alert('Erro: ' + data.message)
-})
-
-socket.on('gameOver', () => { 
-  alert('🏆 Fim de jogo!')
-  location.reload() 
-})
+socket.on('error', (data) => alert('Erro: ' + data.message))
+socket.on('gameOver', () => { alert('🏆 Fim!'); location.reload() })
 
 function allowDrop(e) { e.preventDefault() }
-
-function drop(e, side) { 
-  e.preventDefault()
-  if (!draggedTile) return
-  socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
-  draggedTile = null
-  if (draggedElement) {
-    draggedElement.classList.remove('dragging')
-    draggedElement.style.position = ''
-    draggedElement.style.left = ''
-    draggedElement.style.top = ''
-    draggedElement.style.zIndex = ''
-    draggedElement = null
-  }
-}
-
-function handleDrag(e) { 
-  if (!myTurn) return
-  draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) }
-  draggedElement = e.target.closest('.domino')
-  if (draggedElement) draggedElement.classList.add('dragging')
-}
+function drop(e, side) { e.preventDefault(); if (!draggedTile) return; socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side }); draggedTile = null }
+function handleDrag(e) { if (!myTurn) return; draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) } }
 
 function handleTouchStart(e) {
   if (!myTurn) return
@@ -470,51 +347,22 @@ function handleTouchStart(e) {
   const touch = e.touches[0]
   const target = e.target.closest('.domino')
   if (!target) return
-  
   draggedTile = { v1: parseInt(target.getAttribute('data-v1')), v2: parseInt(target.getAttribute('data-v2')) }
-  draggedElement = target
-  touchStartX = touch.clientX
-  touchStartY = touch.clientY
-  
-  draggedElement.classList.add('dragging')
-  draggedElement.style.position = 'fixed'
-  draggedElement.style.left = (touch.clientX - 16) + 'px'
-  draggedElement.style.top = (touch.clientY - 28) + 'px'
-  draggedElement.style.zIndex = '1000'
-}
-
-function handleTouchMove(e) {
-  if (!draggedElement) return
-  e.preventDefault()
-  const touch = e.touches[0]
-  draggedElement.style.left = (touch.clientX - 16) + 'px'
-  draggedElement.style.top = (touch.clientY - 28) + 'px'
 }
 
 function handleTouchEnd(e) {
-  if (!draggedElement) return
+  if (!draggedTile) return
   e.preventDefault()
-  
   const touch = e.changedTouches[0]
   let side = null
-  
   const dropLeft = document.getElementById('dropLeft')
   const dropRight = document.getElementById('dropRight')
   const dropCenter = document.getElementById('dropCenter')
-  
   if (isOverElement(touch.clientX, touch.clientY, dropLeft)) side = 'left'
   else if (isOverElement(touch.clientX, touch.clientY, dropRight)) side = 'right'
   else if (isOverElement(touch.clientX, touch.clientY, dropCenter)) side = 'center'
   else if (isOverElement(touch.clientX, touch.clientY, document.getElementById('boardTiles'))) side = 'right'
-  
   if (side) socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
-  
-  draggedElement.classList.remove('dragging')
-  draggedElement.style.position = ''
-  draggedElement.style.left = ''
-  draggedElement.style.top = ''
-  draggedElement.style.zIndex = ''
-  draggedElement = null
   draggedTile = null
 }
 
@@ -528,32 +376,17 @@ function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) 
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
 function renderHand(h) {
-  if (!h || !Array.isArray(h) || h.length === 0) { 
-    document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'
-    return 
-  }
-  document.getElementById('hand').innerHTML = h.map(t => {
-    return '<div class="domino" ' + 
-      'draggable="' + myTurn + '" ' +
-      'ondragstart="handleDrag(event)" ' +
-      'ontouchstart="handleTouchStart(event)" ' +
-      'ontouchmove="handleTouchMove(event)" ' +
-      'ontouchend="handleTouchEnd(event)" ' +
-      'data-v1="' + t[0] + '" data-v2="' + t[1] + '">' +
-      '<div class="domino-face top v' + t[0] + '"><div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div></div>' +
-      '<div class="domino-face bottom v' + t[1] + '"><div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div></div>' +
-      '</div>'
-  }).join('')
+  if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
+  document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false)).join('')
 }
 
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
-  document.getElementById('boardTiles').innerHTML = b.map(t => {
-    return '<div class="domino horizontal" data-v1="' + t[0] + '" data-v2="' + t[1] + '">' +
-      '<div class="domino-face top">' + t[0] + '</div>' +
-      '<div class="domino-face bottom">' + t[1] + '</div>' +
-    '</div>'
-  }).join('')
+  document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
+}
+
+function createDomino(v1, v2, horizontal) {
+  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" draggable="' + (!horizontal && myTurn) + '" ondragstart="handleDrag(event)" ontouchstart="handleTouchStart(event)" ontouchend="handleTouchEnd(event)" data-v1="' + v1 + '" data-v2="' + v2 + '"><div class="domino-face top">' + v1 + '</div><div class="domino-face bottom">' + v2 + '</div></div>'
 }
 
 function hideZones() {
@@ -570,14 +403,8 @@ function checkMoves(board) {
     document.getElementById('dropRight').classList.add('hidden')
     return
   }
-  
   const ends = getBoardEnds(board)
-  let can = hand.some(t => {
-    const v0 = parseInt(t[0])
-    const v1 = parseInt(t[1])
-    return (v0 === ends.left || v1 === ends.left || v0 === ends.right || v1 === ends.right)
-  })
-  
+  let can = hand.some(t => parseInt(t[0]) === ends.left || parseInt(t[1]) === ends.left || parseInt(t[0]) === ends.right || parseInt(t[1]) === ends.right)
   if (can) {
     document.getElementById('action-buttons').classList.add('hidden')
     document.getElementById('dropCenter').classList.add('hidden')

@@ -27,8 +27,10 @@
     .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 8px; margin: 8px 0; overflow-x: auto; overflow-y: hidden; width: 100%; position: relative; }
     .board { display: flex; align-items: center; gap: 3px; min-height: 70px; padding: 8px; min-width: max-content; }
     .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; cursor: pointer; flex-shrink: 0; font-size: 9px; background: rgba(255,215,0,0.1); }
+    .drop-zone:hover { background: rgba(255,215,0,0.2); }
     .drop-zone.hidden { display: none; }
     .domino { width: 32px; height: 55px; background: #f5f5dc; border-radius: 5px; display: flex; flex-direction: column; cursor: grab; border: 2px solid #8b7355; flex-shrink: 0; touch-action: none; user-select: none; }
+    .domino:hover { transform: translateY(-2px); border-color: #ffd700; }
     .domino.horizontal { width: 55px; height: 32px; flex-direction: row; }
     .domino-face { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 2px; gap: 1px; }
     .domino-face.top { border-bottom: 1px solid #8b7355; }
@@ -317,7 +319,7 @@ function startGame() {
   socket.emit('startGame', room)
 }
 
-// ✅ CORRIGIDO: gameStart agora define myTurn corretamente
+// ✅ CORRIGIDO: gameStart agora chama showZones para o primeiro movimento
 socket.on('gameStart', (data) => {
   console.log('🎮 gameStart recebido:', data, 'myId:', myId)
   hand = data.hand || []
@@ -333,16 +335,26 @@ socket.on('gameStart', (data) => {
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
   
-  // ✅ HOST sempre começa, então se isHost=true, myTurn=true
+  // ✅ HOST sempre começa
   if (isHost) {
     myTurn = true
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
+    document.getElementById('action-buttons').classList.add('hidden')
+    
+    // ✅ MOSTRAR ZONA DE DROP CENTRAL PARA PRIMEIRA JOGADA
+    console.log('🎲 Primeira jogada - mostrando dropCenter')
+    document.getElementById('dropCenter').classList.remove('hidden')
+    document.getElementById('dropLeft').classList.add('hidden')
+    document.getElementById('dropRight').classList.add('hidden')
+    
     console.log('✅ myTurn definido como TRUE (host começa)')
   } else {
     myTurn = false
     document.getElementById('turn').innerText = '⏳ Aguardando oponente...'
     document.getElementById('turn').classList.remove('active')
+    document.getElementById('action-buttons').classList.add('hidden')
+    hideZones()
     console.log('⏳ myTurn definido como FALSE (guest aguarda)')
   }
 })
@@ -354,17 +366,18 @@ socket.on('update', (data) => {
     deck = data.deckCount
     document.getElementById('deckCount').innerText = deck 
   }
-  // ✅ VERIFICAR SE É MEU TURNO
   if (data.turn === myId) {
     console.log('✅ É meu turno!')
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
     myTurn = true
+    checkMoves(data.board)
   } else {
     console.log('⏳ Turno do oponente:', data.turn)
     document.getElementById('turn').innerText = '⏳ Oponente...'
     document.getElementById('turn').classList.remove('active')
     myTurn = false
+    hideZones()
   }
 })
 
@@ -382,11 +395,13 @@ socket.on('tilePlayed', (data) => {
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
     myTurn = true
+    checkMoves(data.board)
   } else {
     console.log('⏳ Turno do oponente')
     document.getElementById('turn').innerText = '⏳ Oponente...'
     document.getElementById('turn').classList.remove('active')
     myTurn = false
+    hideZones()
   }
 })
 
@@ -397,14 +412,28 @@ socket.on('tileBought', (data) => {
   renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
+  checkMovesAfterBuy(data.board)
 })
 
 socket.on('error', (data) => { alert('Erro: ' + data.message) })
 socket.on('gameOver', () => { alert('🏆 Fim de jogo!'); location.reload() })
 
 function allowDrop(e) { e.preventDefault() }
-function drop(e, side) { e.preventDefault(); if (!draggedTile) return; socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side }); draggedTile = null }
-function handleDrag(e) { if (!myTurn) return; draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) } }
+function drop(e, side) { 
+  e.preventDefault()
+  console.log('🎴 Drop em:', side, 'draggedTile:', draggedTile)
+  if (!draggedTile) return
+  socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  draggedTile = null
+}
+function handleDrag(e) { 
+  if (!myTurn) {
+    console.log('⏳ Não é seu turno!')
+    return
+  }
+  draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) }
+  console.log('🎴 Peça arrastada:', draggedTile)
+}
 function buyTile() { if (myTurn && room) { socket.emit('buyTile', { code: room }) } }
 function passTurn() { if (myTurn && room) { socket.emit('passTurn', { code: room }) } }
 
@@ -424,6 +453,73 @@ function renderHand(h) {
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
   document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
+}
+
+function showZones(first) {
+  console.log('🎲 showZones:', first)
+  document.getElementById('dropCenter').classList.toggle('hidden', !first)
+  document.getElementById('dropLeft').classList.toggle('hidden', first)
+  document.getElementById('dropRight').classList.toggle('hidden', first)
+}
+
+function hideZones() {
+  console.log('🎲 hideZones')
+  document.getElementById('dropCenter').classList.add('hidden')
+  document.getElementById('dropLeft').classList.add('hidden')
+  document.getElementById('dropRight').classList.add('hidden')
+}
+
+function checkMoves(board) {
+  console.log('🔍 checkMoves - board length:', board?.length)
+  const act = document.getElementById('action-buttons')
+  const buy = act.querySelector('.btn-blue')
+  const pass = document.getElementById('passBtn')
+  
+  if (!board || board.length === 0) {
+    console.log('🎲 Primeira jogada - mostrar dropCenter')
+    act.classList.add('hidden')
+    showZones(true)
+    return
+  }
+  
+  const ends = getBoardEnds(board)
+  console.log('📊 Board ends - left:', ends.left, 'right:', ends.right)
+  
+  let can = hand.some(t => {
+    const v0 = parseInt(t[0])
+    const v1 = parseInt(t[1])
+    return (v0 === ends.left || v1 === ends.left || v0 === ends.right || v1 === ends.right)
+  })
+  
+  console.log('🔍 Pode jogar:', can)
+  
+  if (can) {
+    act.classList.add('hidden')
+    showZones(false)
+  } else {
+    hideZones()
+    act.classList.remove('hidden')
+    if (deck > 0) {
+      buy.classList.remove('hidden')
+      pass.classList.add('hidden')
+    } else {
+      buy.classList.add('hidden')
+      pass.classList.remove('hidden')
+    }
+  }
+}
+
+function checkMovesAfterBuy(board) {
+  checkMoves(board)
+}
+
+function getBoardEnds(board) {
+  if (!board || board.length === 0) return { left: null, right: null }
+  const first = board[0]
+  const last = board[board.length - 1]
+  const left = Array.isArray(first) ? parseInt(first[0]) : null
+  const right = Array.isArray(last) ? parseInt(last[1]) : null
+  return { left, right }
 }
 
 function createDomino(v1, v2, horizontal = false, draggable = false) {

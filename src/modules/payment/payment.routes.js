@@ -3,10 +3,8 @@ const router = express.Router()
 const paymentService = require('./payment.service')
 const db = require('../../config/database')
 
-// ✅ Variável para armazenar o io
 let io = null
 
-// ✅ Função para setar o io
 router.setIO = (socketIO) => {
   io = socketIO
   console.log('✅ IO inicializado nas rotas de pagamento')
@@ -39,9 +37,7 @@ router.post('/create', async (req, res) => {
 router.get('/status/:transactionId', async (req, res) => {
   try {
     const { transactionId } = req.params
-    
     const result = await paymentService.getTransactionStatus(transactionId)
-    
     res.json(result)
   } catch (error) {
     console.error('Erro ao verificar status:', error)
@@ -49,13 +45,43 @@ router.get('/status/:transactionId', async (req, res) => {
   }
 })
 
+// ✅ CORRIGIDO: Confirmar pagamento E notificar host se ambos pagaram
 router.post('/confirm', async (req, res) => {
   try {
     const { transactionId } = req.body
     
-    console.log('💰 Confirmando pagamento:', transactionId, 'IO:', io ? 'definido' : 'NÃO DEFINIDO')
+    console.log('💰 Confirmando pagamento:', transactionId)
     
-    await paymentService.confirmPayment(transactionId, io)
+    // 1. Confirmar pagamento no banco
+    await paymentService.confirmPayment(transactionId)
+    
+    // 2. Buscar dados da transação
+    const txResult = await db.query(
+      `SELECT room_code FROM transactions WHERE id = $1`,
+      [transactionId]
+    )
+    
+    if (txResult.rows.length > 0) {
+      const roomCode = txResult.rows[0].room_code
+      
+      // 3. Buscar sala para verificar se ambos pagaram
+      const roomResult = await db.query(
+        `SELECT * FROM rooms WHERE code = $1`,
+        [roomCode]
+      )
+      
+      if (roomResult.rows.length > 0) {
+        const room = roomResult.rows[0]
+        
+        console.log('📊 Sala:', roomCode, 'Host:', room.host_id, 'Host Paid:', room.host_paid, 'Guest Paid:', room.guest_paid)
+        
+        // 4. ✅ Se ambos pagaram, notificar host via socket
+        if (room.host_paid && room.guest_paid && room.host_id && io) {
+          console.log('✅ Ambos pagaram! Emitindo bothPaid para host:', room.host_id)
+          io.to(room.host_id).emit('bothPaid', { roomId: roomCode })
+        }
+      }
+    }
     
     res.json({ success: true })
   } catch (error) {
@@ -67,9 +93,7 @@ router.post('/confirm', async (req, res) => {
 router.post('/cancel', async (req, res) => {
   try {
     const { transactionId } = req.body
-    
     await paymentService.cancelPayment(transactionId)
-    
     res.json({ success: true })
   } catch (error) {
     console.error('Erro ao cancelar pagamento:', error)

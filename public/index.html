@@ -77,14 +77,9 @@
 <div id="payment-screen" class="screen">
   <div class="card">
     <h1>💰 Pagamento via PIX</h1>
-    <div class="payment-info">
-      <p>Valor da entrada:</p>
-      <strong>R$ 10,00</strong>
-    </div>
+    <div class="payment-info"><p>Valor da entrada:</p><strong>R$ 10,00</strong></div>
     <div class="payment-warning">⚠️ Após pagar, clique em "✅ Já Paguei" e aguarde a confirmação do admin.</div>
-    <div id="pixQRContainer" style="text-align:center;">
-      <img id="pixQRCode" src="/pix-qr-code.png" alt="QR Code PIX">
-    </div>
+    <div id="pixQRContainer" style="text-align:center;"><img id="pixQRCode" src="/pix-qr-code.png" alt="QR Code PIX"></div>
     <p style="text-align:center;color:#ffd700;font-size:12px;margin:10px 0;">📱 Escaneie o QR Code ou copie o código abaixo</p>
     <p id="pixCode" onclick="copyPixCode()">📋 Toque para copiar</p>
     <p id="paymentStatus">⏳ Aguardando pagamento...</p>
@@ -130,7 +125,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io()
-let room = null, myId = null, myTurn = false, isHost = false, draggedTile = null, draggedElement = null, hand = [], deck = 14, touchStartX = 0, touchStartY = 0
+let room = null, myId = null, myTurn = false, isHost = false, draggedTile = null, draggedElement = null, hand = [], deck = 14
 let wakeLock = null, gameRecoveryData = null
 let currentTransactionId = null, paymentCheckInterval = null, paymentData = null, hostCheckInterval = null
 
@@ -207,12 +202,19 @@ socket.on('roomCreated', (data) => {
   document.getElementById('startBtn').classList.add('hidden')
 })
 
+// ✅ CORRIGIDO: Verificar playerType ANTES de definir isHost!
 socket.on('paymentRequired', (data) => {
   console.log('💰 Pagamento necessário:', data)
   currentTransactionId = null
   
-  isHost = true
-  console.log('👑 isHost definido como TRUE - paymentRequired')
+  // ✅ VERIFICAR playerType!
+  if (data.playerType === 'host') {
+    isHost = true
+    console.log('👑 isHost definido como TRUE (host)')
+  } else {
+    isHost = false
+    console.log('👤 isHost definido como FALSE (guest)')
+  }
   
   if (data.roomId) { 
     room = data.roomId
@@ -296,17 +298,16 @@ socket.on('roomJoined', (data) => {
   document.getElementById('startBtn').classList.add('hidden')
 })
 
-// ✅ CORRIGIDO: bothPaid SÓ libera botão para HOST
+// ✅ bothPaid SÓ libera botão para HOST
 socket.on('bothPaid', (data) => {
   console.log('📩 bothPaid recebido:', data, 'isHost:', isHost, 'myId:', myId, 'room:', room)
   
-  // ✅ VERIFICAÇÃO DUPLA: isHost E room
   if (isHost === true && room) {
     console.log('✅ HOST recebeu bothPaid, liberando botão!')
     document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
     document.getElementById('startBtn').classList.remove('hidden')
   } else {
-    console.log('⏳ Guest ou não-host recebeu bothPaid, aguardando host...')
+    console.log('⏳ Guest recebeu bothPaid, aguardando host...')
     document.getElementById('waitMessage').innerText = '🎲 Aguardando host iniciar...'
     document.getElementById('startBtn').classList.add('hidden')
   }

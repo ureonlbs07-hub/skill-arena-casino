@@ -52,9 +52,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() })
 })
 
-// ============================================
-// 🔥 ROTA DO ADMIN
-// ============================================
 app.get('/admin', (req, res) => {
   res.sendFile(__dirname + '/public/admin.html')
 })
@@ -67,6 +64,14 @@ async function initDatabase() {
     const schema = fs.readFileSync('./database/schema.sql', 'utf8')
     await db.query(schema)
     console.log('✅ Tabelas criadas/atualizadas!')
+    
+    // ✅ ADICIONAR COLUNA player_type SE NÃO EXISTIR
+    await db.query(`
+      ALTER TABLE transactions 
+      ADD COLUMN IF NOT EXISTS player_type VARCHAR(20)
+    `)
+    console.log('✅ Coluna player_type adicionada!')
+    
   } catch (err) {
     console.error('❌ Erro ao criar tabelas:', err.message)
   }

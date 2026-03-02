@@ -30,9 +30,13 @@ let rooms = {}
 let users = {}
 let adminSessions = {}
 
+// ✅ ROTAS DEFINIDAS APENAS UMA VEZ
 app.use('/api/payment', paymentRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/game', gameRoutes)
+
+// ✅ INICIALIZAR IO NAS ROTAS DE PAGAMENTO
+paymentRoutes.setIO(io)
 
 app.get('/api/monetization-status', async (req, res) => {
   const settings = await adminService.getAllSettings()
@@ -145,7 +149,6 @@ io.on('connection', (socket) => {
     sendRoomList()
   })
 
-  // ✅ STARTGAME CORRIGIDO
   socket.on('startGame', async (code) => {
     const room = rooms[code]
     if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
@@ -284,11 +287,8 @@ io.on('connection', (socket) => {
     io.emit('update', { board: room.board, turn: room.turn, deckCount: room.deck.length })
   })
 
-  // ✅ NOVO: Jogador confirma pagamento (aguarda admin)
   socket.on('paymentConfirmed', async (data) => {
     console.log('💰 Pagamento confirmado pelo jogador:', data)
-    // ✅ Apenas notifica, não libera ainda!
-    // Admin precisa confirmar no painel
   })
 
   socket.on('disconnect', async () => {
@@ -319,7 +319,6 @@ function sendRoomList() {
 // ============================================
 const PORT = process.env.PORT || 3000
 
-// ✅ INICIALIZA BANCO ANTES DE INICIAR O SERVIDOR
 initDatabase().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log('============================================')

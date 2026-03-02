@@ -168,7 +168,7 @@
       </div>
       <div style="text-align:right;">
         <div class="toggle" id="monetizationToggle" onclick="toggleMonetization()"></div>
-        <p id="monetizationStatus" style="margin-top:10px;color:#dc3545;font-weight:bold;">DESATIVADO</p>
+        <p id="monetizationStatus" style="margin-top:10px;color:#dc3545;font-weight:bold;">❌ DESATIVADO</p>
       </div>
     </div>
     
@@ -208,7 +208,6 @@
 </div>
 
 <script>
-// ✅ CORRIGIDO: adminToken em vez de sessionId
 let adminToken = null
 
 // ============================================
@@ -226,7 +225,6 @@ function adminLogin() {
   .then(res => res.json())
   .then(data => {
     if (data.success) {
-      // ✅ CORRIGIDO: token em vez de sessionId
       adminToken = data.token
       localStorage.setItem('adminToken', adminToken)
       showMessage('loginMessage', 'Login realizado com sucesso!', 'success')
@@ -245,7 +243,6 @@ function adminLogin() {
 }
 
 function adminLogout() {
-  // ✅ CORRIGIDO: adminToken em vez de sessionId
   adminToken = null
   localStorage.removeItem('adminToken')
   showScreen('login-screen')
@@ -272,7 +269,6 @@ function showMessage(elementId, message, type) {
 }
 
 function loadAdminData() {
-  // ✅ CORRIGIDO: adminToken em vez de sessionId
   if (!adminToken) {
     const saved = localStorage.getItem('adminToken')
     if (saved) adminToken = saved
@@ -302,18 +298,8 @@ function loadAdminData() {
     // Transações
     document.getElementById('totalTransactions').innerText = data.transactions.length
     
-    // Atualizar toggle
-    const toggle = document.getElementById('monetizationToggle')
-    const status = document.getElementById('monetizationStatus')
-    if (data.settings.monetizationEnabled) {
-      toggle.classList.add('active')
-      status.innerText = '✅ ATIVADO'
-      status.style.color = '#28a745'
-    } else {
-      toggle.classList.remove('active')
-      status.innerText = '❌ DESATIVADO'
-      status.style.color = '#dc3545'
-    }
+    // ✅ ATUALIZAR TOGGLE CORRETAMENTE
+    updateToggleVisual(data.settings.monetization_enabled)
     
     // Lista de transações
     const list = document.getElementById('transactionsList')
@@ -341,11 +327,31 @@ function loadAdminData() {
   })
 }
 
+// ✅ NOVA FUNÇÃO: Atualiza visual do toggle
+function updateToggleVisual(monetizationEnabled) {
+  const toggle = document.getElementById('monetizationToggle')
+  const status = document.getElementById('monetizationStatus')
+  
+  // ✅ Converte string para booleano corretamente
+  const isEnabled = monetizationEnabled === 'true' || monetizationEnabled === true
+  
+  console.log('📊 updateToggleVisual:', { monetizationEnabled, isEnabled })
+  
+  if (isEnabled) {
+    toggle.classList.add('active')
+    status.innerText = '✅ ATIVADO'
+    status.style.color = '#28a745'
+  } else {
+    toggle.classList.remove('active')
+    status.innerText = '❌ DESATIVADO'
+    status.style.color = '#dc3545'
+  }
+}
+
 // ============================================
 // 🔥 TOGGLE MONETIZAÇÃO
 // ============================================
 function toggleMonetization() {
-  // ✅ CORRIGIDO: adminToken em vez de sessionId
   if (!adminToken) {
     const saved = localStorage.getItem('adminToken')
     if (saved) adminToken = saved
@@ -354,11 +360,14 @@ function toggleMonetization() {
   
   const toggle = document.getElementById('monetizationToggle')
   const status = document.getElementById('monetizationStatus')
-  const newState = !toggle.classList.contains('active')
   
-  console.log('🔧 Toggle monetização:', newState)
+  // ✅ Pega o estado ATUAL do toggle
+  const currentState = toggle.classList.contains('active')
+  const newState = !currentState
   
-  // ✅ CORRIGIDO: token em vez de sessionId
+  console.log('🔧 Toggle monetização:', { currentState, newState })
+  
+  // ✅ Envia para backend
   fetch('/api/admin/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -371,22 +380,23 @@ function toggleMonetization() {
   .then(data => {
     console.log('📊 Resposta:', data)
     if (data.success) {
-      toggle.classList.toggle('active')
-      status.innerText = newState ? '✅ ATIVADO' : '❌ DESATIVADO'
-      status.style.color = newState ? '#28a745' : '#dc3545'
+      // ✅ Atualiza visual APÓS confirmar do backend
+      updateToggleVisual(newState)
+      
       showMessage('dashboardMessage', 
         newState ? 'Monetização ATIVADA!' : 'Monetização DESATIVADA!', 
         'success'
       )
+      
+      // ✅ Recarrega dados após 1.5 segundos para confirmar do banco
+      setTimeout(() => loadAdminData(), 1500)
     } else {
       showMessage('dashboardMessage', 'Erro: ' + data.error, 'error')
-      toggle.classList.toggle('active')
     }
   })
   .catch(err => {
     console.error('❌ Erro:', err)
     showMessage('dashboardMessage', 'Erro de conexão', 'error')
-    toggle.classList.toggle('active')
   })
 }
 
@@ -394,7 +404,6 @@ function toggleMonetization() {
 // 🔥 INIT
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
-  // ✅ CORRIGIDO: adminToken em vez de adminSessionId
   const saved = localStorage.getItem('adminToken')
   if (saved) {
     adminToken = saved

@@ -484,6 +484,9 @@ let currentTransactionId = null
 let paymentCheckInterval = null
 let paymentData = null
 
+// ✅ Variável para polling do host
+let hostCheckInterval = null
+
 // ✅ SEU PIX COPIA E COLA AQUI
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
@@ -568,7 +571,6 @@ function updateScrollArrows() {
 async function createPayment(data) {
   paymentData = data
   
-  // ✅ SALVAR O ROOM ANTES DE IR PARA TELA DE PAGAMENTO
   if (data.roomId) {
     room = data.roomId
     console.log('💾 Room salvo antes do pagamento:', room)
@@ -596,7 +598,6 @@ async function createPayment(data) {
   showScreen('payment-screen')
 }
 
-// ✅ CORRIGIDO: NÃO libera a sala imediatamente!
 function confirmPaymentManual() {
   if (!currentTransactionId) return
   
@@ -612,7 +613,6 @@ function confirmPaymentManual() {
   startAdminConfirmationCheck()
 }
 
-// ✅ NOVA FUNÇÃO: Verifica se admin confirmou (a cada 5 segundos)
 function startAdminConfirmationCheck() {
   paymentCheckInterval = setInterval(async () => {
     if (!currentTransactionId) return
@@ -631,7 +631,6 @@ function startAdminConfirmationCheck() {
         setTimeout(() => {
           showScreen('wait-screen')
           
-          // ✅ GARANTIR QUE O ROOM ESTÁ DEFINIDO
           if (!room && paymentData?.roomId) {
             room = paymentData.roomId
           }
@@ -670,6 +669,36 @@ function cancelPayment() {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
+  
+  // ✅ Host verifica se ambos pagaram (polling)
+  if (id === 'wait-screen' && isHost && room) {
+    startHostPaymentCheck()
+  }
+}
+
+// ✅ NOVA FUNÇÃO: Host verifica pagamentos via polling
+function startHostPaymentCheck() {
+  if (hostCheckInterval) clearInterval(hostCheckInterval)
+  
+  hostCheckInterval = setInterval(async () => {
+    if (!room || !isHost) return
+    
+    try {
+      const res = await fetch(`/api/room/status/${room}`)
+      const result = await res.json()
+      
+      console.log('📊 Status da sala:', result)
+      
+      if (result.hostPaid && result.guestPaid) {
+        clearInterval(hostCheckInterval)
+        document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
+        document.getElementById('startBtn').classList.remove('hidden')
+        console.log('✅ Ambos pagaram! Botão INICIAR liberado!')
+      }
+    } catch (error) {
+      console.error('Erro ao verificar pagamentos:', error)
+    }
+  }, 3000)
 }
 
 function createDomino(v1, v2, horizontal = false, draggable = false) {
@@ -785,7 +814,6 @@ socket.on('roomCreated', (data) => {
 socket.on('paymentRequired', (data) => {
   currentTransactionId = null
   
-  // ✅ SALVAR ROOM ANTES DE CRIAR PAGAMENTO
   if (data.roomId) {
     room = data.roomId
     console.log('💾 Room salvo no paymentRequired:', room)
@@ -1024,9 +1052,6 @@ socket.on('gameOver', () => {
   location.reload() 
 })
 
-// ============================================
-// EVENT LISTENERS
-// ============================================
 document.addEventListener('DOMContentLoaded', () => {
   const boardContainer = document.getElementById('boardContainer')
   if (boardContainer) {

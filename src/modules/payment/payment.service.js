@@ -7,14 +7,15 @@ class PaymentService {
     
     const transactionId = uuidv4()
     
+    // ✅ SALVAR player_type NO BANCO
     const result = await db.query(
-      `INSERT INTO transactions (id, user_id, room_code, amount, type, status) 
-       VALUES ($1, $2, $3, $4, $5, 'pending') 
+      `INSERT INTO transactions (id, user_id, room_code, amount, type, status, player_type) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
        RETURNING *`,
-      [transactionId, userId, roomId, amount, 'entry']
+      [transactionId, userId, roomId, amount, 'entry', 'pending', playerType]
     )
     
-    console.log('✅ Transação criada:', result.rows[0].id, 'Status:', result.rows[0].status)
+    console.log('✅ Transação criada:', result.rows[0].id, 'Player Type:', playerType)
     
     return {
       success: true,
@@ -66,8 +67,7 @@ class PaymentService {
     )
   }
 
-  // ✅ CORRIGIDO: Verifica se ambos pagaram e emite evento
-  async confirmPayment(transactionId, io) {
+  async confirmPayment(transactionId) {
     console.log('💰 Confirmando pagamento:', transactionId)
     
     await db.query(
@@ -82,27 +82,7 @@ class PaymentService {
     
     if (result.rows.length > 0) {
       const { room_code, user_id } = result.rows[0]
-      console.log('💰 Pagamento confirmado - Sala:', room_code, 'User:', user_id)
-      
-      // ✅ Buscar sala para verificar se ambos pagaram
-      const roomResult = await db.query(
-        `SELECT * FROM rooms WHERE code = $1`,
-        [room_code]
-      )
-      
-      if (roomResult.rows.length > 0) {
-        const room = roomResult.rows[0]
-        
-        // ✅ Verifica se ambos pagaram
-        if (room.host_paid && room.guest_paid) {
-          console.log('✅ Ambos pagaram! Notificando host:', room.host_id)
-          
-          // ✅ Emite bothPaid para o host
-          if (room.host_id) {
-            io.to(room.host_id).emit('bothPaid', { roomId: room_code })
-          }
-        }
-      }
+      console.log('💰 Pagamento confirmado - Sala:', room_code)
     }
   }
 
@@ -131,8 +111,6 @@ class PaymentService {
       }
       
       const transaction = result.rows[0]
-      console.log('📊 Transaction status:', transaction.status)
-      
       return { 
         paid: transaction.status === 'completed',
         status: transaction.status,

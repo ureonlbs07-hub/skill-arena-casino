@@ -51,6 +51,7 @@ router.post('/confirm', async (req, res) => {
     const { transactionId } = req.body
     
     console.log('💰 Confirmando pagamento:', transactionId)
+    console.log('📡 IO está definido:', io ? 'SIM' : 'NÃO')
     
     // 1. Confirmar pagamento no banco
     await paymentService.confirmPayment(transactionId)
@@ -61,56 +62,44 @@ router.post('/confirm', async (req, res) => {
       [transactionId]
     )
     
-    if (txResult.rows.length > 0) {
-      const roomCode = txResult.rows[0].room_code
-      
-      // 3. Buscar sala para verificar se ambos pagaram
-      const roomResult = await db.query(
-        `SELECT * FROM rooms WHERE code = $1`,
-        [roomCode]
-      )
-      
-      if (roomResult.rows.length > 0) {
-        const room = roomResult.rows[0]
-        
-        console.log('📊 Sala:', roomCode, 'Host:', room.host_id, 'Host Paid:', room.host_paid, 'Guest Paid:', room.guest_paid)
-        
-        // 4. ✅ Se ambos pagaram, notificar host via socket
-        if (room.host_paid && room.guest_paid && room.host_id && io) {
-          console.log('✅ Ambos pagaram! Emitindo bothPaid para host:', room.host_id)
-          io.to(room.host_id).emit('bothPaid', { roomId: roomCode })
-        }
-      }
+    if (txResult.rows.length === 0) {
+      console.log('❌ Transação não encontrada')
+      return res.json({ success: false, error: 'Transação não encontrada' })
+    }
+    
+    const roomCode = txResult.rows[0].room_code
+    console.log('📊 Código da sala:', roomCode)
+    
+    // 3. Buscar sala do banco
+    const roomResult = await db.query(
+      `SELECT * FROM rooms WHERE code = $1`,
+      [roomCode]
+    )
+    
+    if (roomResult.rows.length === 0) {
+      console.log('❌ Sala não encontrada')
+      return res.json({ success: false, error: 'Sala não encontrada' })
+    }
+    
+    const room = roomResult.rows[0]
+    
+    console.log('📊 host_id:', room.host_id)
+    console.log('📊 guest_id:', room.guest_id)
+    console.log('📊 host_paid:', room.host_paid)
+    console.log('📊 guest_paid:', room.guest_paid)
+    
+    // 4. ✅ Se ambos pagaram, notificar host via socket
+    if (room.host_paid && room.guest_paid && room.host_id && io) {
+      console.log('✅ AMBOS PAGARAM!')
+      console.log('✅ Emitindo bothPaid para host:', room.host_id)
+      io.to(room.host_id).emit('bothPaid', { roomId: roomCode })
+      console.log('✅ bothPaid emitido com sucesso!')
+    } else {
+      console.log('⏳ Aguardando ambos pagarem...')
+      console.log('⏳ host_paid:', room.host_paid, 'guest_paid:', room.guest_paid)
+      console.log('⏳ host_id:', room.host_id, 'io:', io ? 'definido' : 'NÃO DEFINIDO')
     }
     
     res.json({ success: true })
   } catch (error) {
-    console.error('Erro ao confirmar pagamento:', error)
-    res.status(500).json({ success: false, error: error.message })
-  }
-})
-
-router.post('/cancel', async (req, res) => {
-  try {
-    const { transactionId } = req.body
-    await paymentService.cancelPayment(transactionId)
-    res.json({ success: true })
-  } catch (error) {
-    console.error('Erro ao cancelar pagamento:', error)
-    res.status(500).json({ success: false, error: error.message })
-  }
-})
-
-router.get('/pending', async (req, res) => {
-  try {
-    console.log('🔧 /api/payment/pending chamado')
-    const transactions = await paymentService.getPendingPayments()
-    console.log('📊 Pendentes encontrados:', transactions.length)
-    res.json({ transactions })
-  } catch (error) {
-    console.error('Erro ao listar pendentes:', error)
-    res.status(500).json({ success: false, error: error.message, transactions: [] })
-  }
-})
-
-module.exports = router
+    console.error('❌ Erro ao confirmar

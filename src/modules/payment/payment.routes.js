@@ -1,8 +1,9 @@
 const express = require('express')
 const router = express.Router()
 const paymentService = require('./payment.service')
+const db = require('../../config/database')
 
-// ✅ SIMPLIFICADO: Cria transação manual
+// ✅ Cria transação
 router.post('/create', async (req, res) => {
   try {
     const { roomId, userId, amount, playerType } = req.body
@@ -27,31 +28,21 @@ router.post('/create', async (req, res) => {
   }
 })
 
-// ✅ SIMPLIFICADO: Verifica status (sempre retorna pending até admin confirmar)
+// ✅ Verifica status da transação
 router.get('/status/:transactionId', async (req, res) => {
   try {
     const { transactionId } = req.params
     
-    const result = await db.query(
-      `SELECT * FROM transactions WHERE id = $1`,
-      [transactionId]
-    )
+    const result = await paymentService.getTransactionStatus(transactionId)
     
-    if (result.rows.length === 0) {
-      return res.json({ paid: false })
-    }
-    
-    const transaction = result.rows[0]
-    res.json({ 
-      paid: transaction.status === 'completed',
-      status: transaction.status
-    })
+    res.json(result)
   } catch (error) {
-    res.status(500).json({ paid: false, error: error.message })
+    console.error('Erro ao verificar status:', error)
+    res.status(500).json({ paid: false, status: 'error', error: error.message })
   }
 })
 
-// ✅ NOVO: Admin confirma pagamento manualmente
+// ✅ Admin confirma pagamento
 router.post('/confirm', async (req, res) => {
   try {
     const { transactionId } = req.body
@@ -60,19 +51,21 @@ router.post('/confirm', async (req, res) => {
     
     res.json({ success: true })
   } catch (error) {
+    console.error('Erro ao confirmar pagamento:', error)
     res.status(500).json({ success: false, error: error.message })
   }
 })
 
-// ✅ NOVO: Lista transações pendentes
+// ✅ Lista pagamentos pendentes
 router.get('/pending', async (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT * FROM transactions WHERE status = 'pending' ORDER BY created_at DESC`
-    )
-    res.json({ transactions: result.rows })
+    console.log('🔧 /api/payment/pending chamado')
+    const transactions = await paymentService.getPendingPayments()
+    console.log('📊 Pendentes encontrados:', transactions.length)
+    res.json({ transactions })
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message })
+    console.error('Erro ao listar pendentes:', error)
+    res.status(500).json({ success: false, error: error.message, transactions: [] })
   }
 })
 

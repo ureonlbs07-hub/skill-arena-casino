@@ -98,16 +98,7 @@
     }
     .toggle.active::after { left: 32px; }
     
-    .status-badge {
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: bold;
-    }
-    .status-active { background: #28a745; }
-    .status-inactive { background: #dc3545; }
-    
-    #transactionsList {
+    #transactionsList, #pendingPaymentsList {
       max-height: 400px;
       overflow-y: auto;
       background: #1a2733;
@@ -138,6 +129,15 @@
     }
     .message.success { background: #28a745; }
     .message.error { background: #dc3545; }
+
+    .pending-badge {
+      background: #ffc107;
+      color: #000;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -190,7 +190,13 @@
         <p style="color:#888;margin-top:5px;">Total processadas</p>
       </div>
     </div>
-    
+
+    <!-- ✅ PAGAMENTOS PENDENTES (NOVO) -->
+    <h2 style="margin-top:30px;">⏳ Pagamentos Pendentes</h2>
+    <div id="pendingPaymentsList">
+      <p style="text-align:center;color:#888;padding:20px;">Nenhum pagamento pendente</p>
+    </div>
+
     <!-- Transações -->
     <h2 style="margin-top:30px;">📜 Histórico de Transações</h2>
     <div id="transactionsList">
@@ -298,7 +304,7 @@ function loadAdminData() {
     // Transações
     document.getElementById('totalTransactions').innerText = data.transactions.length
     
-    // ✅ ATUALIZAR TOGGLE CORRETAMENTE
+    // Atualizar toggle
     updateToggleVisual(data.settings.monetization_enabled)
     
     // Lista de transações
@@ -325,17 +331,17 @@ function loadAdminData() {
     console.error(err)
     showMessage('dashboardMessage', 'Erro ao carregar dados', 'error')
   })
+
+  // ✅ Carrega pagamentos pendentes
+  loadPendingPayments()
 }
 
-// ✅ NOVA FUNÇÃO: Atualiza visual do toggle
+// ✅ Atualiza visual do toggle
 function updateToggleVisual(monetizationEnabled) {
   const toggle = document.getElementById('monetizationToggle')
   const status = document.getElementById('monetizationStatus')
   
-  // ✅ Converte string para booleano corretamente
   const isEnabled = monetizationEnabled === 'true' || monetizationEnabled === true
-  
-  console.log('📊 updateToggleVisual:', { monetizationEnabled, isEnabled })
   
   if (isEnabled) {
     toggle.classList.add('active')
@@ -361,13 +367,9 @@ function toggleMonetization() {
   const toggle = document.getElementById('monetizationToggle')
   const status = document.getElementById('monetizationStatus')
   
-  // ✅ Pega o estado ATUAL do toggle
   const currentState = toggle.classList.contains('active')
   const newState = !currentState
   
-  console.log('🔧 Toggle monetização:', { currentState, newState })
-  
-  // ✅ Envia para backend
   fetch('/api/admin/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -378,17 +380,12 @@ function toggleMonetization() {
   })
   .then(res => res.json())
   .then(data => {
-    console.log('📊 Resposta:', data)
     if (data.success) {
-      // ✅ Atualiza visual APÓS confirmar do backend
       updateToggleVisual(newState)
-      
       showMessage('dashboardMessage', 
         newState ? 'Monetização ATIVADA!' : 'Monetização DESATIVADA!', 
         'success'
       )
-      
-      // ✅ Recarrega dados após 1.5 segundos para confirmar do banco
       setTimeout(() => loadAdminData(), 1500)
     } else {
       showMessage('dashboardMessage', 'Erro: ' + data.error, 'error')
@@ -398,6 +395,64 @@ function toggleMonetization() {
     console.error('❌ Erro:', err)
     showMessage('dashboardMessage', 'Erro de conexão', 'error')
   })
+}
+
+// ============================================
+// 🔥 PAGAMENTOS PENDENTES (NOVO)
+// ============================================
+async function loadPendingPayments() {
+  try {
+    console.log('🔧 loadPendingPayments chamado')
+    const res = await fetch('/api/payment/pending')
+    const data = await res.json()
+    
+    console.log('📊 Dados recebidos:', data)
+    
+    const list = document.getElementById('pendingPaymentsList')
+    if (!data.transactions || data.transactions.length === 0) {
+      list.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">Nenhum pagamento pendente</p>'
+    } else {
+      list.innerHTML = data.transactions.map(t => `
+        <div class="transaction-item">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong>Sala: ${t.room_code}</strong>
+              <span style="background:#ffc107;color:#000;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;margin-left:8px;">PENDENTE</span><br>
+              <small>R$ ${t.amount.toFixed(2)} - ${new Date(t.created_at).toLocaleString('pt-BR')}</small>
+            </div>
+            <button class="btn-green" style="width:auto;padding:8px 16px;" 
+              onclick="confirmPayment('${t.id}')">✅ Confirmar</button>
+          </div>
+        </div>
+      `).join('')
+    }
+  } catch (error) {
+    console.error('Erro ao carregar pendentes:', error)
+    document.getElementById('pendingPaymentsList').innerHTML = 
+      '<p style="text-align:center;color:#dc3545;padding:20px;">Erro ao carregar</p>'
+  }
+}
+
+async function confirmPayment(transactionId) {
+  try {
+    console.log('💰 Confirmando pagamento:', transactionId)
+    const res = await fetch('/api/payment/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transactionId })
+    })
+    const result = await res.json()
+    
+    if (result.success) {
+      showMessage('dashboardMessage', 'Pagamento confirmado!', 'success')
+      loadPendingPayments()
+      loadAdminData()
+    } else {
+      showMessage('dashboardMessage', 'Erro: ' + result.error, 'error')
+    }
+  } catch (error) {
+    showMessage('dashboardMessage', 'Erro de conexão', 'error')
+  }
 }
 
 // ============================================

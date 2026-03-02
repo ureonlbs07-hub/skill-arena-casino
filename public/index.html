@@ -2,11 +2,11 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Dominó - Skill Arena</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; }
+    body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; touch-action: manipulation; }
     .screen { display: none; }
     .screen.active { display: block; }
     .card { background: rgba(0,0,0,0.8); border-radius: 15px; padding: 15px; max-width: 400px; margin: 20px auto; }
@@ -28,8 +28,9 @@
     .board { display: flex; align-items: center; gap: 3px; min-height: 70px; padding: 8px; min-width: max-content; }
     .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; cursor: pointer; flex-shrink: 0; font-size: 9px; background: rgba(255,215,0,0.1); }
     .drop-zone.hidden { display: none; }
-    .domino { width: 32px; height: 55px; background: #f5f5dc; border-radius: 5px; display: flex; flex-direction: column; cursor: grab; border: 2px solid #8b7355; flex-shrink: 0; }
+    .domino { width: 32px; height: 55px; background: #f5f5dc; border-radius: 5px; display: flex; flex-direction: column; cursor: grab; border: 2px solid #8b7355; flex-shrink: 0; touch-action: none; }
     .domino.horizontal { width: 55px; height: 32px; flex-direction: row; }
+    .domino.dragging { opacity: 0.5; transform: scale(1.1); }
     .domino-face { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 2px; gap: 1px; }
     .domino-face.top { border-bottom: 1px solid #8b7355; }
     .domino.horizontal .domino-face.top { border-bottom: none; border-right: 1px solid #8b7355; }
@@ -109,10 +110,10 @@
   <div class="board-container">
     <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;font-size:14px;">📌 Mesa</h3>
     <div class="board">
-      <div class="drop-zone hidden" id="dropLeft" ondragover="allowDrop(event)" ondrop="drop(event,'left')">⬅️</div>
+      <div class="drop-zone hidden" id="dropLeft">⬅️</div>
       <div id="boardTiles"></div>
-      <div class="drop-zone hidden" id="dropRight" ondragover="allowDrop(event)" ondrop="drop(event,'right')">➡️</div>
-      <div class="drop-zone hidden" id="dropCenter" ondragover="allowDrop(event)" ondrop="drop(event,'center')">🎲</div>
+      <div class="drop-zone hidden" id="dropRight">➡️</div>
+      <div class="drop-zone hidden" id="dropCenter">🎲</div>
     </div>
   </div>
   <h3 style="text-align:center;color:#ffd700;font-size:14px;">🎮 Sua Mão</h3>
@@ -123,17 +124,64 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io()
+const socket = io({ reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 1000 })
+
 let room = null, myId = null, myTurn = false, isHost = false, hand = [], deck = 14
 let currentTransactionId = null, paymentCheckInterval = null, paymentData = null, hostCheckInterval = null
-let draggedTile = null
+let draggedTile = null, draggedElement = null
+let touchStartX = 0, touchStartY = 0
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
+
+// ✅ SALVAR ESTADO NO LOCALSTORAGE
+function saveGameState() {
+  const state = { room, myId, isHost, hand, deck, myTurn, timestamp: Date.now() }
+  localStorage.setItem('dominoGameState', JSON.stringify(state))
+  console.log('💾 Estado salvo:', state)
+}
+
+// ✅ RECUPERAR ESTADO DO LOCALSTORAGE
+function loadGameState() {
+  const saved = localStorage.getItem('dominoGameState')
+  if (saved) {
+    try {
+      const state = JSON.parse(saved)
+      // ✅ Só recupera se tiver menos de 5 minutos
+      if (Date.now() - state.timestamp < 300000) {
+        room = state.room
+        myId = state.myId
+        isHost = state.isHost
+        hand = state.hand || []
+        deck = state.deck || 14
+        myTurn = state.myTurn || false
+        console.log('✅ Estado recuperado:', state)
+        return true
+      }
+    } catch (e) { console.error('Erro ao carregar estado:', e) }
+  }
+  return false
+}
+
+// ✅ LIMPAR ESTADO
+function clearGameState() {
+  localStorage.removeItem('dominoGameState')
+  console.log('🗑️ Estado limpo')
+}
+
+// ✅ AVISAR ANTES DE SAIR
+window.addEventListener('beforeunload', (e) => {
+  if (room) {
+    e.preventDefault()
+    e.returnValue = 'Você está em uma partida!'
+    saveGameState()
+  }
+})
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
   if (id === 'wait-screen' && isHost && room) startHostPaymentCheck()
+  if (id === 'game-screen') saveGameState()
 }
 
 function startHostPaymentCheck() {
@@ -158,13 +206,47 @@ function register() {
   socket.emit('register', u)
 }
 
-socket.on('registered', (data) => { myId = data.id; showScreen('menu-screen') })
+socket.on('registered', (data) => { 
+  myId = data.id
+  console.log('✅ Registrado:', myId)
+  
+  // ✅ TENTAR RECUPERAR JOGO
+  const recovered = loadGameState()
+  if (recovered && room) {
+    console.log('🔄 Recuperando jogo na sala:', room)
+    socket.emit('joinRoom', room)
+    showScreen('wait-screen')
+    document.getElementById('waitMessage').innerText = '🔄 Reconectando...'
+    return
+  }
+  
+  showScreen('menu-screen')
+})
 
-function createRoom() { socket.emit('createRoom') }
+socket.on('connect', () => {
+  console.log('🔌 Socket conectado:', socket.id)
+  // ✅ Tentar recuperar após reconexão
+  const recovered = loadGameState()
+  if (recovered && room && myId) {
+    socket.emit('register', 'reconnect')
+  }
+})
+
+socket.on('disconnect', () => {
+  console.log('❌ Socket desconectado')
+  saveGameState()
+})
+
+function createRoom() { 
+  console.log('🏠 Criando sala...')
+  socket.emit('createRoom') 
+}
 
 socket.on('roomCreated', (data) => {
   room = data.code; isHost = true
+  console.log('✅ Sala criada:', room)
   document.getElementById('myRoomCode').innerText = 'Sua sala: ' + room
+  saveGameState()
   showScreen('wait-screen')
   document.getElementById('waitMessage').innerText = '👑 Aguardando...'
   document.getElementById('startBtn').classList.add('hidden')
@@ -173,7 +255,11 @@ socket.on('roomCreated', (data) => {
 socket.on('paymentRequired', (data) => {
   currentTransactionId = null
   isHost = (data.playerType === 'host')
-  if (data.roomId) room = data.roomId
+  if (data.roomId) {
+    room = data.roomId
+    console.log('💾 Room salvo:', room)
+    saveGameState()
+  }
   createPayment(data)
 })
 
@@ -215,6 +301,7 @@ function startAdminConfirmationCheck() {
           showScreen('wait-screen')
           if (!room && paymentData?.roomId) room = paymentData.roomId
           document.getElementById('waitMessage').innerText = paymentData?.playerType === 'host' ? '👑 Aguardando convidado...' : '🎲 Aguardando host...'
+          saveGameState()
         }, 2000)
       }
     } catch (e) {}
@@ -222,7 +309,13 @@ function startAdminConfirmationCheck() {
 }
 
 function copyPixCode() { navigator.clipboard.writeText(PIX_COPY_PASTE); alert('PIX copiado! ✅') }
-function cancelPayment() { if (paymentCheckInterval) clearInterval(paymentCheckInterval); currentTransactionId = null; paymentData = null; showScreen('menu-screen') }
+function cancelPayment() { 
+  if (paymentCheckInterval) clearInterval(paymentCheckInterval)
+  currentTransactionId = null
+  paymentData = null
+  clearGameState()
+  showScreen('menu-screen')
+}
 
 socket.on('roomList', (rooms) => {
   const ul = document.getElementById('rooms')
@@ -234,16 +327,22 @@ socket.on('roomList', (rooms) => {
   })
 })
 
-function joinRoom(code) { socket.emit('joinRoom', code) }
+function joinRoom(code) { 
+  console.log('🚪 Entrando na sala:', code)
+  socket.emit('joinRoom', code) 
+}
 
 socket.on('roomJoined', (data) => {
   room = data.code; isHost = false
+  console.log('✅ Entrou na sala:', room)
+  saveGameState()
   showScreen('wait-screen')
   document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
   document.getElementById('startBtn').classList.add('hidden')
 })
 
 socket.on('bothPaid', (data) => {
+  console.log('📩 bothPaid recebido')
   if (isHost && room) {
     document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
     document.getElementById('startBtn').classList.remove('hidden')
@@ -262,6 +361,7 @@ socket.on('gameStart', (data) => {
   deck = data.deckCount || 14
   isHost = data.isHost || false
   
+  saveGameState()
   showScreen('game-screen')
   renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
@@ -272,7 +372,6 @@ socket.on('gameStart', (data) => {
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
     document.getElementById('action-buttons').classList.add('hidden')
-    // ✅ PRIMEIRA JOGADA - MOSTRAR DROP CENTER
     document.getElementById('dropCenter').classList.remove('hidden')
     document.getElementById('dropLeft').classList.add('hidden')
     document.getElementById('dropRight').classList.add('hidden')
@@ -286,7 +385,7 @@ socket.on('gameStart', (data) => {
 
 socket.on('update', (data) => {
   if (data.board) renderBoard(data.board)
-  if (data.deckCount !== undefined) { deck = data.deckCount; document.getElementById('deckCount').innerText = deck }
+  if (data.deckCount !== undefined) { deck = data.deckCount; document.getElementById('deckCount').innerText = deck; saveGameState() }
   if (data.turn === myId) {
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
@@ -303,6 +402,7 @@ socket.on('update', (data) => {
 socket.on('tilePlayed', (data) => {
   hand = data.hand || []
   deck = data.deckCount || 14
+  saveGameState()
   renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
@@ -323,6 +423,7 @@ socket.on('tilePlayed', (data) => {
 socket.on('tileBought', (data) => {
   hand = data.hand || []
   deck = data.deckCount || 14
+  saveGameState()
   renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
@@ -330,22 +431,126 @@ socket.on('tileBought', (data) => {
 })
 
 socket.on('error', (data) => { alert('Erro: ' + data.message) })
-socket.on('gameOver', () => { alert('🏆 Fim!'); location.reload() })
+socket.on('gameOver', () => { 
+  alert('🏆 Fim!')
+  clearGameState()
+  location.reload() 
+})
 
+// ✅ DRAG AND DROP (DESKTOP)
 function allowDrop(e) { e.preventDefault() }
-function drop(e, side) { e.preventDefault(); if (!draggedTile) return; socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side }); draggedTile = null }
-function handleDrag(e) { if (!myTurn) return; draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) } }
+function drop(e, side) { 
+  e.preventDefault()
+  if (!draggedTile) return
+  socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  draggedTile = null
+  if (draggedElement) {
+    draggedElement.classList.remove('dragging')
+    draggedElement.style.position = ''
+    draggedElement.style.left = ''
+    draggedElement.style.top = ''
+    draggedElement.style.zIndex = ''
+    draggedElement = null
+  }
+}
+function handleDrag(e) { 
+  if (!myTurn) return
+  draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) }
+  draggedElement = e.target.closest('.domino')
+  if (draggedElement) draggedElement.classList.add('dragging')
+}
+
+// ✅ TOUCH EVENTS (MOBILE)
+function handleTouchStart(e) {
+  if (!myTurn) return
+  e.preventDefault()
+  const touch = e.touches[0]
+  const target = e.target.closest('.domino')
+  if (!target) return
+  
+  draggedTile = { v1: parseInt(target.getAttribute('data-v1')), v2: parseInt(target.getAttribute('data-v2')) }
+  draggedElement = target
+  
+  touchStartX = touch.clientX
+  touchStartY = touch.clientY
+  
+  draggedElement.classList.add('dragging')
+  draggedElement.style.position = 'fixed'
+  draggedElement.style.left = (touch.clientX - 16) + 'px'
+  draggedElement.style.top = (touch.clientY - 28) + 'px'
+  draggedElement.style.zIndex = '1000'
+}
+
+function handleTouchMove(e) {
+  if (!draggedElement) return
+  e.preventDefault()
+  const touch = e.touches[0]
+  draggedElement.style.left = (touch.clientX - 16) + 'px'
+  draggedElement.style.top = (touch.clientY - 28) + 'px'
+}
+
+function handleTouchEnd(e) {
+  if (!draggedElement) return
+  e.preventDefault()
+  
+  const touch = e.changedTouches[0]
+  let side = null
+  
+  const dropLeft = document.getElementById('dropLeft')
+  const dropRight = document.getElementById('dropRight')
+  const dropCenter = document.getElementById('dropCenter')
+  
+  if (isOverElement(touch.clientX, touch.clientY, dropLeft)) side = 'left'
+  else if (isOverElement(touch.clientX, touch.clientY, dropRight)) side = 'right'
+  else if (isOverElement(touch.clientX, touch.clientY, dropCenter)) side = 'center'
+  else if (isOverElement(touch.clientX, touch.clientY, document.getElementById('boardTiles'))) side = 'right'
+  
+  if (side) {
+    socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  }
+  
+  draggedElement.classList.remove('dragging')
+  draggedElement.style.position = ''
+  draggedElement.style.left = ''
+  draggedElement.style.top = ''
+  draggedElement.style.zIndex = ''
+  draggedElement = null
+  draggedTile = null
+}
+
+function isOverElement(x, y, element) {
+  if (!element || element.classList.contains('hidden')) return false
+  const rect = element.getBoundingClientRect()
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
 function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
 function renderHand(h) {
   if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
-  document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false, true)).join('')
+  document.getElementById('hand').innerHTML = h.map(t => {
+    return '<div class="domino" ' + 
+      'draggable="' + myTurn + '" ' +
+      'ondragstart="handleDrag(event)" ' +
+      'ontouchstart="handleTouchStart(event)" ' +
+      'ontouchmove="handleTouchMove(event)" ' +
+      'ontouchend="handleTouchEnd(event)" ' +
+      'data-v1="' + t[0] + '" data-v2="' + t[1] + '">' +
+      '<div class="domino-face top v' + t[0] + '"><div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div></div>' +
+      '<div class="domino-face bottom v' + t[1] + '"><div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div></div>' +
+      '</div>'
+  }).join('')
 }
 
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
-  document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
+  document.getElementById('boardTiles').innerHTML = b.map(t => {
+    return '<div class="domino horizontal" data-v1="' + t[0] + '" data-v2="' + t[1] + '">' +
+      '<div class="domino-face top v' + t[0] + '"><div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div></div>' +
+      '<div class="domino-face bottom v' + t[1] + '"><div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div></div>' +
+      '</div>'
+  }).join('')
 }
 
 function hideZones() {
@@ -385,12 +590,6 @@ function checkMoves(board) {
 function getBoardEnds(board) {
   if (!board || board.length === 0) return { left: null, right: null }
   return { left: parseInt(board[0][0]), right: parseInt(board[board.length - 1][1]) }
-}
-
-function createDomino(v1, v2, horizontal = false, draggable = false) {
-  const n1 = parseInt(v1), n2 = parseInt(v2)
-  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
-  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ' + (draggable ? 'draggable="true" ondragstart="handleDrag(event)"' : '') + ' data-v1="' + n1 + '" data-v2="' + n2 + '"><div class="domino-face top v' + n1 + '">' + pips + '</div><div class="domino-face bottom v' + n2 + '">' + pips + '</div></div>'
 }
 </script>
 </body>

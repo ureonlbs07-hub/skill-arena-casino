@@ -2,217 +2,38 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dominó - Skill Arena</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: sans-serif; 
-      background: #1a472a; 
-      color: white; 
-      padding: 5px;
-      min-height: 100vh;
-      overflow-x: hidden;
-      touch-action: manipulation;
-    }
+    body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; }
     .screen { display: none; }
     .screen.active { display: block; }
-    .card { 
-      background: rgba(0,0,0,0.8); 
-      border-radius: 15px; 
-      padding: 15px; 
-      max-width: 400px; 
-      margin: 20px auto; 
-    }
+    .card { background: rgba(0,0,0,0.8); border-radius: 15px; padding: 15px; max-width: 400px; margin: 20px auto; }
     h1 { text-align: center; color: #ffd700; margin-bottom: 15px; font-size: 1.5em; }
-    input { 
-      width: 100%; 
-      padding: 12px; 
-      margin: 8px 0; 
-      border-radius: 8px; 
-      border: 2px solid #ffd700; 
-      background: rgba(0,0,0,0.6); 
-      color: white;
-      font-size: 16px;
-    }
-    button { 
-      width: 100%; 
-      padding: 14px; 
-      margin: 8px 0; 
-      border: none; 
-      border-radius: 8px; 
-      font-weight: bold; 
-      cursor: pointer;
-      font-size: 16px;
-    }
+    input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 2px solid #ffd700; background: rgba(0,0,0,0.6); color: white; font-size: 16px; }
+    button { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
     .btn-green { background: #28a745; color: white; }
     .btn-blue { background: #007bff; color: white; }
     .btn-red { background: #dc3545; color: white; font-size: 18px; }
     .btn-yellow { background: #ffc107; color: black; }
     .hidden { display: none; }
     #rooms { list-style: none; }
-    #rooms li { 
-      padding: 10px; 
-      margin: 5px 0; 
-      background: rgba(255,255,255,0.1); 
-      border-radius: 8px; 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center;
-    }
-    
-    .player-bar { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center;
-      background: rgba(0,0,0,0.6); 
-      padding: 10px; 
-      border-radius: 10px; 
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .deck-pile { 
-      width: 45px; 
-      height: 65px; 
-      background: #2d5a3d; 
-      border: 3px dashed #ffd700; 
-      border-radius: 8px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      color: #ffd700; 
-      font-weight: bold; 
-      cursor: pointer;
-      font-size: 16px;
-    }
-    
-    #turn { 
-      text-align: center; 
-      padding: 12px; 
-      background: rgba(0,0,0,0.6); 
-      border-radius: 10px; 
-      margin: 10px 0; 
-      font-weight: bold;
-    }
+    #rooms li { padding: 10px; margin: 5px 0; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .player-bar { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+    .deck-pile { width: 45px; height: 65px; background: #2d5a3d; border: 3px dashed #ffd700; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ffd700; font-weight: bold; cursor: pointer; font-size: 16px; }
+    #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
     #turn.active { background: #28a745; }
-    
-    .board-container { 
-      background: #1a472a; 
-      border: 4px solid #3d2817; 
-      border-radius: 10px; 
-      padding: 8px; 
-      margin: 8px 0; 
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      width: 100%;
-      position: relative;
-    }
-    
-    .scroll-arrow {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 24px;
-      color: rgba(255, 215, 0, 0.5);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      z-index: 10;
-      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-    }
-    
-    .scroll-arrow.left { left: 5px; }
-    .scroll-arrow.right { right: 5px; }
-    
-    .scroll-arrow.visible {
-      opacity: 1;
-      animation: pulseArrow 2s infinite;
-    }
-    
-    @keyframes pulseArrow {
-      0%, 100% { opacity: 0.5; }
-      50% { opacity: 1; }
-    }
-    
-    .board { 
-      display: flex; 
-      align-items: center;
-      gap: 3px; 
-      min-height: 70px; 
-      padding: 8px;
-      min-width: max-content;
-    }
-    
-    .drop-zone { 
-      width: 32px; 
-      height: 55px; 
-      border: 2px dashed #ffd700; 
-      border-radius: 6px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      color: #ffd700; 
-      cursor: pointer; 
-      flex-shrink: 0;
-      font-size: 9px;
-      background: rgba(255,215,0,0.1);
-    }
-    .drop-zone:hover { background: rgba(255,215,0,0.2); }
+    .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 8px; margin: 8px 0; overflow-x: auto; overflow-y: hidden; width: 100%; position: relative; }
+    .board { display: flex; align-items: center; gap: 3px; min-height: 70px; padding: 8px; min-width: max-content; }
+    .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; cursor: pointer; flex-shrink: 0; font-size: 9px; background: rgba(255,215,0,0.1); }
     .drop-zone.hidden { display: none; }
-    
-    .domino { 
-      width: 32px; 
-      height: 55px; 
-      background: #f5f5dc; 
-      border-radius: 5px; 
-      display: flex; 
-      flex-direction: column; 
-      cursor: grab; 
-      border: 2px solid #8b7355; 
-      flex-shrink: 0;
-      touch-action: none;
-      user-select: none;
-    }
-    .domino:hover { 
-      transform: translateY(-2px); 
-      border-color: #ffd700;
-    }
-    .domino.horizontal { 
-      width: 55px; 
-      height: 32px; 
-      flex-direction: row; 
-    }
-    .domino.dragging { 
-      opacity: 0.6; 
-      transform: scale(1.1);
-      z-index: 1000;
-    }
-    
-    .domino-face { 
-      flex: 1; 
-      display: grid; 
-      grid-template-columns: repeat(3, 1fr); 
-      grid-template-rows: repeat(3, 1fr); 
-      padding: 2px; 
-      gap: 1px; 
-    }
+    .domino { width: 32px; height: 55px; background: #f5f5dc; border-radius: 5px; display: flex; flex-direction: column; cursor: grab; border: 2px solid #8b7355; flex-shrink: 0; touch-action: none; user-select: none; }
+    .domino.horizontal { width: 55px; height: 32px; flex-direction: row; }
+    .domino-face { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 2px; gap: 1px; }
     .domino-face.top { border-bottom: 1px solid #8b7355; }
-    .domino.horizontal .domino-face.top { 
-      border-bottom: none; 
-      border-right: 1px solid #8b7355; 
-    }
-    
-    .pip { 
-      background: #000; 
-      border-radius: 50%; 
-      width: 4px; 
-      height: 4px; 
-      justify-self: center; 
-      align-self: center; 
-      display: none; 
-    }
+    .domino.horizontal .domino-face.top { border-bottom: none; border-right: 1px solid #8b7355; }
+    .pip { background: #000; border-radius: 50%; width: 4px; height: 4px; justify-self: center; align-self: center; display: none; }
     .v0 .pip { display: none; }
     .v1 .p5 { display: block; }
     .v2 .p1, .v2 .p9 { display: block; }
@@ -220,166 +41,21 @@
     .v4 .p1, .v4 .p3, .v4 .p7, .v4 .p9 { display: block; }
     .v5 .p1, .v5 .p3, .v5 .p5, .v5 .p7, .v5 .p9 { display: block; }
     .v6 .p1, .v6 .p3, .v6 .p4, .v6 .p6, .v6 .p7, .v6 .p9 { display: block; }
-    
-    .hand { 
-      display: flex; 
-      flex-wrap: wrap; 
-      gap: 5px; 
-      justify-content: center; 
-      min-height: 65px; 
-      background: rgba(0,0,0,0.4); 
-      border-radius: 10px; 
-      padding: 8px; 
-    }
-    #action-buttons { 
-      display: flex; 
-      gap: 8px; 
-      justify-content: center; 
-      margin: 8px 0;
-      flex-wrap: wrap;
-    }
-    #action-buttons button { 
-      width: auto; 
-      padding: 10px 18px;
-      font-size: 13px;
-    }
-
-    @media (min-width: 600px) {
-      body { padding: 10px; }
-      .card { padding: 20px; max-width: 500px; }
-      h1 { font-size: 2em; }
-      .domino { width: 40px; height: 68px; }
-      .domino.horizontal { width: 68px; height: 40px; }
-      .pip { width: 5px; height: 5px; }
-      .deck-pile { width: 55px; height: 75px; }
-      .drop-zone { width: 40px; height: 68px; }
-      .board-container { min-height: 100px; padding: 12px; }
-      .board { min-height: 85px; gap: 4px; }
-    }
-
-    @media (min-width: 1024px) {
-      body { padding: 20px; }
-      .card { padding: 30px; max-width: 600px; }
-      h1 { font-size: 2.5em; }
-      .domino { width: 48px; height: 82px; }
-      .domino.horizontal { width: 82px; height: 48px; }
-      .pip { width: 7px; height: 7px; }
-      .deck-pile { width: 65px; height: 90px; }
-      .drop-zone { width: 48px; height: 82px; }
-      .board-container { min-height: 130px; padding: 20px; }
-      .board { min-height: 100px; gap: 5px; }
-    }
-
-    .dev-signature {
-      position: fixed;
-      bottom: 10px;
-      right: 15px;
-      text-align: center;
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.35);
-      z-index: 9999;
-      transition: all 0.3s ease;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 8px 14px;
-      border-radius: 20px;
-      border: 1px solid rgba(255, 215, 0, 0.25);
-      backdrop-filter: blur(5px);
-      pointer-events: auto;
-      font-weight: 500;
-    }
-
-    .dev-signature:hover {
-      color: rgba(255, 215, 0, 0.95);
-      background: rgba(0, 0, 0, 0.6);
-      border-color: rgba(255, 215, 0, 0.6);
-      transform: translateY(-3px);
-      box-shadow: 0 6px 20px rgba(255, 215, 0, 0.25);
-    }
-
-    .dev-signature strong {
-      color: rgba(255, 215, 0, 0.65);
-      font-size: 12px;
-      transition: color 0.3s ease;
-      display: block;
-      margin-top: 2px;
-    }
-
-    .dev-signature:hover strong {
-      color: rgba(255, 215, 0, 1);
-      text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
-    }
-
-    @media (max-width: 768px) {
-      .dev-signature {
-        bottom: 8px;
-        right: 50%;
-        transform: translateX(50%);
-        font-size: 10px;
-        padding: 6px 12px;
-      }
-      
-      .dev-signature:hover {
-        transform: translateX(50%) translateY(-3px);
-      }
-      
-      .dev-signature strong {
-        font-size: 11px;
-      }
-    }
-
-    #pixQRCode {
-      max-width: 200px;
-      border: 2px solid #ffd700;
-      border-radius: 10px;
-      margin: 15px auto;
-      display: block;
-    }
-    #pixCode {
-      font-family: monospace;
-      font-size: 11px;
-      background: #000;
-      padding: 10px;
-      border-radius: 8px;
-      word-break: break-all;
-      cursor: pointer;
-      text-align: center;
-    }
-    #pixCode:hover {
-      background: #222;
-    }
-    #paymentStatus {
-      text-align: center;
-      color: #ffd700;
-      margin: 15px 0;
-      font-size: 1.1em;
-    }
-    .payment-info {
-      background: rgba(255, 215, 0, 0.1);
-      border: 1px solid #ffd700;
-      border-radius: 8px;
-      padding: 12px;
-      margin: 15px 0;
-      text-align: center;
-    }
-    .payment-info strong {
-      color: #28a745;
-      font-size: 1.3em;
-    }
-    .payment-warning {
-      background: rgba(255, 193, 7, 0.2);
-      border: 1px solid #ffc107;
-      border-radius: 8px;
-      padding: 10px;
-      margin: 10px 0;
-      text-align: center;
-      font-size: 12px;
-      color: #ffc107;
-    }
+    .hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; min-height: 65px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 8px; }
+    #action-buttons { display: flex; gap: 8px; justify-content: center; margin: 8px 0; flex-wrap: wrap; }
+    #action-buttons button { width: auto; padding: 10px 18px; font-size: 13px; }
+    .dev-signature { position: fixed; bottom: 10px; right: 15px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.35); z-index: 9999; background: rgba(0,0,0,0.4); padding: 8px 14px; border-radius: 20px; }
+    .dev-signature strong { color: #ffd700; }
+    #pixQRCode { max-width: 200px; border: 2px solid #ffd700; border-radius: 10px; margin: 15px auto; display: block; }
+    #pixCode { font-family: monospace; font-size: 11px; background: #000; padding: 10px; border-radius: 8px; word-break: break-all; cursor: pointer; text-align: center; }
+    #paymentStatus { text-align: center; color: #ffd700; margin: 15px 0; font-size: 1.1em; }
+    .payment-info { background: rgba(255,215,0,0.1); border: 1px solid #ffd700; border-radius: 8px; padding: 12px; margin: 15px 0; text-align: center; }
+    .payment-info strong { color: #28a745; font-size: 1.3em; }
+    .payment-warning { background: rgba(255,193,7,0.2); border: 1px solid #ffc107; border-radius: 8px; padding: 10px; margin: 10px 0; text-align: center; font-size: 12px; color: #ffc107; }
   </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login-screen" class="screen active">
   <div class="card">
     <h1>🎲 Dominó</h1>
@@ -388,7 +64,6 @@
   </div>
 </div>
 
-<!-- MENU -->
 <div id="menu-screen" class="screen">
   <div class="card">
     <h1>🎲 Dominó</h1>
@@ -399,7 +74,6 @@
   </div>
 </div>
 
-<!-- 🔥 PAGAMENTO PIX MANUAL -->
 <div id="payment-screen" class="screen">
   <div class="card">
     <h1>💰 Pagamento via PIX</h1>
@@ -407,29 +81,18 @@
       <p>Valor da entrada:</p>
       <strong>R$ 10,00</strong>
     </div>
-    
-    <div class="payment-warning">
-      ⚠️ Após pagar, clique em "✅ Já Paguei" e aguarde a confirmação do admin.
-    </div>
-    
+    <div class="payment-warning">⚠️ Após pagar, clique em "✅ Já Paguei" e aguarde a confirmação do admin.</div>
     <div id="pixQRContainer" style="text-align:center;">
       <img id="pixQRCode" src="/pix-qr-code.png" alt="QR Code PIX">
     </div>
-    
-    <p style="text-align:center;color:#ffd700;font-size:12px;margin:10px 0;">
-      📱 Escaneie o QR Code ou copie o código abaixo
-    </p>
-    
+    <p style="text-align:center;color:#ffd700;font-size:12px;margin:10px 0;">📱 Escaneie o QR Code ou copie o código abaixo</p>
     <p id="pixCode" onclick="copyPixCode()">📋 Toque para copiar</p>
-    
     <p id="paymentStatus">⏳ Aguardando pagamento...</p>
-    
     <button class="btn-green" onclick="confirmPaymentManual()">✅ Já Paguei</button>
     <button class="btn-red" onclick="cancelPayment()">❌ Cancelar</button>
   </div>
 </div>
 
-<!-- AGUARDANDO -->
 <div id="wait-screen" class="screen">
   <div class="card">
     <h1>⏳ Aguardando</h1>
@@ -438,7 +101,6 @@
   </div>
 </div>
 
-<!-- JOGO -->
 <div id="game-screen" class="screen">
   <div class="player-bar">
     <div>👤 Você: <b id="myCount" style="color:#28a745">7</b></div>
@@ -451,9 +113,6 @@
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
   <div class="board-container" id="boardContainer">
-    <div class="scroll-arrow left" id="scrollArrowLeft">◀</div>
-    <div class="scroll-arrow right" id="scrollArrowRight">▶</div>
-    
     <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;font-size:14px;">📌 Mesa</h3>
     <div class="board">
       <div class="drop-zone hidden" id="dropLeft" ondragover="allowDrop(event)" ondrop="drop(event,'left')">⬅️</div>
@@ -466,325 +125,57 @@
   <div class="hand" id="hand"></div>
 </div>
 
-<!-- ✍️ ASSINATURA DO DESENVOLVEDOR -->
-<div class="dev-signature">
-  Powered by
-  <strong>Gabriel Archanjo Lima</strong>
-</div>
+<div class="dev-signature">Powered by <strong>Gabriel Archanjo Lima</strong></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io()
 let room = null, myId = null, myTurn = false, isHost = false, draggedTile = null, draggedElement = null, hand = [], deck = 14, touchStartX = 0, touchStartY = 0
-let wakeLock = null
-let gameRecoveryData = null
+let wakeLock = null, gameRecoveryData = null
+let currentTransactionId = null, paymentCheckInterval = null, paymentData = null, hostCheckInterval = null
 
-// 🔥 Variáveis de pagamento
-let currentTransactionId = null
-let paymentCheckInterval = null
-let paymentData = null
-
-// ✅ Variável para polling do host
-let hostCheckInterval = null
-
-// ✅ SEU PIX COPIA E COLA AQUI
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
-// ============================================
-// 🔥 MANTER TELA LIGADA
-// ============================================
-async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen')
-      console.log('📱 Tela não vai apagar!')
-    }
-  } catch (err) {
-    console.log('⚠️ Wake Lock não suportado:', err)
-  }
-}
-
-// ============================================
-// 🔥 SALVAR ESTADO DO JOGO
-// ============================================
-function saveGameState() {
-  if (room) {
-    gameRecoveryData = { room, myId, myTurn, isHost, hand, deck, timestamp: Date.now() }
-    localStorage.setItem('dominoGameRecovery', JSON.stringify(gameRecoveryData))
-  }
-}
-
-function loadGameState() {
-  const saved = localStorage.getItem('dominoGameRecovery')
-  if (saved) {
-    try {
-      return JSON.parse(saved)
-    } catch (e) {
-      return null
-    }
-  }
-  return null
-}
-
-function clearGameState() {
-  localStorage.removeItem('dominoGameRecovery')
-  gameRecoveryData = null
-}
-
-// ============================================
-// 🔥 AVISAR ANTES DE SAIR
-// ============================================
-window.addEventListener('beforeunload', (e) => {
-  if (room) {
-    e.preventDefault()
-    e.returnValue = 'Você está em uma partida!'
-    saveGameState()
-  }
-})
-
-// ============================================
-// 🔥 SETAS DE SCROLL
-// ============================================
-function updateScrollArrows() {
-  const container = document.getElementById('boardContainer')
-  const arrowLeft = document.getElementById('scrollArrowLeft')
-  const arrowRight = document.getElementById('scrollArrowRight')
-  
-  if (!container) return
-  
-  if (container.scrollLeft > 10) {
-    arrowLeft.classList.add('visible')
-  } else {
-    arrowLeft.classList.remove('visible')
-  }
-  
-  if (container.scrollLeft < container.scrollWidth - container.clientWidth - 10) {
-    arrowRight.classList.add('visible')
-  } else {
-    arrowRight.classList.remove('visible')
-  }
-}
-
-// ============================================
-// 🔥 FUNÇÕES DE PAGAMENTO MANUAL
-// ============================================
-async function createPayment(data) {
-  paymentData = data
-  
-  if (data.roomId) {
-    room = data.roomId
-    console.log('💾 Room salvo antes do pagamento:', room)
-  }
-  
-  try {
-    const res = await fetch('/api/payment/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-    const result = await res.json()
-    
-    if (result.success) {
-      currentTransactionId = result.transactionId
-      document.getElementById('pixQRCode').src = '/pix-qr-code.png'
-      document.getElementById('pixCode').innerText = PIX_COPY_PASTE
-      document.getElementById('paymentStatus').innerText = '⏳ Aguardando pagamento...'
-      document.getElementById('paymentStatus').style.color = '#ffd700'
-    }
-  } catch (error) {
-    console.error('Erro:', error)
-  }
-  
-  showScreen('payment-screen')
-}
-
-function confirmPaymentManual() {
-  if (!currentTransactionId) return
-  
-  document.getElementById('paymentStatus').innerText = '⏳ Aguardando confirmação do admin...'
-  document.getElementById('paymentStatus').style.color = '#ffc107'
-  
-  socket.emit('paymentConfirmed', {
-    transactionId: currentTransactionId,
-    roomId: paymentData?.roomId,
-    playerType: paymentData?.playerType
-  })
-  
-  startAdminConfirmationCheck()
-}
-
-function startAdminConfirmationCheck() {
-  paymentCheckInterval = setInterval(async () => {
-    if (!currentTransactionId) return
-    
-    try {
-      const res = await fetch(`/api/payment/status/${currentTransactionId}`)
-      const result = await res.json()
-      
-      console.log('📊 Status do pagamento:', result)
-      
-      if (result.status === 'completed') {
-        clearInterval(paymentCheckInterval)
-        document.getElementById('paymentStatus').innerText = '✅ Pagamento confirmado!'
-        document.getElementById('paymentStatus').style.color = '#28a745'
-        
-        setTimeout(() => {
-          showScreen('wait-screen')
-          
-          if (!room && paymentData?.roomId) {
-            room = paymentData.roomId
-          }
-          
-          if (paymentData?.playerType === 'host') {
-            document.getElementById('waitMessage').innerText = '👑 Aguardando convidado...'
-            document.getElementById('myRoomCode').innerText = 'Sua sala: ' + room
-          } else {
-            document.getElementById('waitMessage').innerText = '🎲 Aguardando host iniciar...'
-          }
-        }, 2000)
-      }
-    } catch (error) {
-      console.error('Erro ao verificar:', error)
-    }
-  }, 5000)
-}
-
-function copyPixCode() {
-  navigator.clipboard.writeText(PIX_COPY_PASTE)
-  alert('Código PIX copiado! ✅')
-}
-
-function cancelPayment() {
-  if (paymentCheckInterval) {
-    clearInterval(paymentCheckInterval)
-  }
-  currentTransactionId = null
-  paymentData = null
-  showScreen('menu-screen')
-}
-
-// ============================================
-// FUNÇÕES DO JOGO
-// ============================================
 function showScreen(id) {
+  console.log('🖥️ showScreen:', id, 'room:', room, 'isHost:', isHost)
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
   
-  // ✅ Host verifica se ambos pagaram (polling)
   if (id === 'wait-screen' && isHost && room) {
+    console.log('🔍 Host na wait-screen, iniciando polling...')
     startHostPaymentCheck()
   }
 }
 
-// ✅ NOVA FUNÇÃO: Host verifica pagamentos via polling
 function startHostPaymentCheck() {
+  console.log('🔄 startHostPaymentCheck INICIADO - room:', room, 'isHost:', isHost)
   if (hostCheckInterval) clearInterval(hostCheckInterval)
   
   hostCheckInterval = setInterval(async () => {
-    if (!room || !isHost) return
+    if (!room || !isHost) {
+      console.log('⏸️ Polling pausado - room:', room, 'isHost:', isHost)
+      return
+    }
     
     try {
-      const res = await fetch(`/api/room/status/${room}`)
+      const url = `/api/room/status/${room}`
+      console.log('📡 Polling:', url)
+      
+      const res = await fetch(url)
       const result = await res.json()
       
       console.log('📊 Status da sala:', result)
       
       if (result.hostPaid && result.guestPaid) {
+        console.log('✅ AMBOS PAGARAM! Liberando botão...')
         clearInterval(hostCheckInterval)
         document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
         document.getElementById('startBtn').classList.remove('hidden')
-        console.log('✅ Ambos pagaram! Botão INICIAR liberado!')
       }
     } catch (error) {
-      console.error('Erro ao verificar pagamentos:', error)
+      console.error('❌ Erro no polling:', error)
     }
-  }, 3000)
-}
-
-function createDomino(v1, v2, horizontal = false, draggable = false) {
-  const n1 = parseInt(v1), n2 = parseInt(v2)
-  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
-  const f1 = '<div class="domino-face top v' + n1 + '">' + pips + '</div>'
-  const f2 = '<div class="domino-face bottom v' + n2 + '">' + pips + '</div>'
-  const attrs = (draggable ? 'draggable="true" ondragstart="handleDrag(event)" ontouchstart="handleTouchStart(event)" ontouchmove="handleTouchMove(event)" ontouchend="handleTouchEnd(event)"' : '') + ' data-v1="' + n1 + '" data-v2="' + n2 + '"'
-  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ' + attrs + '>' + f1 + f2 + '</div>'
-}
-
-function handleDrag(e) {
-  if (!myTurn) return
-  const v1 = e.target.getAttribute('data-v1')
-  const v2 = e.target.getAttribute('data-v2')
-  if (!v1 || !v2) return
-  draggedTile = { v1: parseInt(v1), v2: parseInt(v2) }
-  e.target.classList.add('dragging')
-  draggedElement = e.target
-}
-
-function handleTouchStart(e) {
-  if (!myTurn) return
-  e.preventDefault()
-  const touch = e.touches[0]
-  const target = e.target.closest('.domino')
-  if (!target) return
-  const v1 = target.getAttribute('data-v1')
-  const v2 = target.getAttribute('data-v2')
-  if (!v1 || !v2) return
-  draggedTile = { v1: parseInt(v1), v2: parseInt(v2) }
-  draggedElement = target
-  touchStartX = touch.clientX
-  touchStartY = touch.clientY
-  target.classList.add('dragging')
-  target.style.position = 'fixed'
-  target.style.left = (touch.clientX - 16) + 'px'
-  target.style.top = (touch.clientY - 28) + 'px'
-  target.style.zIndex = '1000'
-}
-
-function handleTouchMove(e) {
-  if (!draggedElement) return
-  e.preventDefault()
-  const touch = e.touches[0]
-  draggedElement.style.left = (touch.clientX - 16) + 'px'
-  draggedElement.style.top = (touch.clientY - 28) + 'px'
-}
-
-function handleTouchEnd(e) {
-  if (!draggedElement) return
-  e.preventDefault()
-  const touch = e.changedTouches[0]
-  let side = null
-  const dropLeft = document.getElementById('dropLeft')
-  const dropRight = document.getElementById('dropRight')
-  const dropCenter = document.getElementById('dropCenter')
-  if (isOverElement(touch.clientX, touch.clientY, dropLeft)) side = 'left'
-  else if (isOverElement(touch.clientX, touch.clientY, dropRight)) side = 'right'
-  else if (isOverElement(touch.clientX, touch.clientY, dropCenter)) side = 'center'
-  else if (isOverElement(touch.clientX, touch.clientY, document.getElementById('boardTiles'))) side = 'right'
-  if (side) socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
-  draggedElement.classList.remove('dragging')
-  draggedElement.style.position = ''
-  draggedElement.style.left = ''
-  draggedElement.style.top = ''
-  draggedElement.style.zIndex = ''
-  draggedElement = null
-  draggedTile = null
-}
-
-function isOverElement(x, y, element) {
-  if (!element || element.classList.contains('hidden')) return false
-  const rect = element.getBoundingClientRect()
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
-}
-
-function allowDrop(e) { e.preventDefault() }
-
-function drop(e, side) {
-  e.preventDefault()
-  if (!draggedTile) return
-  socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
-  if (draggedElement) draggedElement.classList.remove('dragging')
-  draggedElement = null
-  draggedTile = null
+  }, 2000)
 }
 
 function register() {
@@ -795,16 +186,19 @@ function register() {
 
 socket.on('registered', (data) => {
   myId = data.id
+  console.log('✅ Registrado:', myId)
   showScreen('menu-screen')
 })
 
 function createRoom() {
+  console.log('🏠 Criando sala...')
   socket.emit('createRoom')
 }
 
 socket.on('roomCreated', (data) => {
   room = data.code
   isHost = true
+  console.log('✅ Sala criada:', room, 'isHost:', isHost)
   document.getElementById('myRoomCode').innerText = 'Sua sala: ' + room
   showScreen('wait-screen')
   document.getElementById('waitMessage').innerText = '👑 Aguardando...'
@@ -812,31 +206,62 @@ socket.on('roomCreated', (data) => {
 })
 
 socket.on('paymentRequired', (data) => {
+  console.log('💰 Pagamento necessário:', data)
   currentTransactionId = null
-  
-  if (data.roomId) {
-    room = data.roomId
-    console.log('💾 Room salvo no paymentRequired:', room)
-  }
-  
+  if (data.roomId) { room = data.roomId; console.log('💾 Room salvo:', room) }
   createPayment(data)
 })
 
-socket.on('paymentConfirmed', (data) => {
-  document.getElementById('paymentStatus').innerText = '✅ Pagamento confirmado!'
-  document.getElementById('paymentStatus').style.color = '#28a745'
-  setTimeout(() => {
-    showScreen('wait-screen')
-    document.getElementById('waitMessage').innerText = '🎲 Aguardando...'
-  }, 2000)
-})
+async function createPayment(data) {
+  paymentData = data
+  if (data.roomId) { room = data.roomId; console.log('💾 Room antes do pagamento:', room) }
+  
+  try {
+    const res = await fetch('/api/payment/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    const result = await res.json()
+    if (result.success) {
+      currentTransactionId = result.transactionId
+      document.getElementById('pixQRCode').src = '/pix-qr-code.png'
+      document.getElementById('pixCode').innerText = PIX_COPY_PASTE
+      document.getElementById('paymentStatus').innerText = '⏳ Aguardando pagamento...'
+    }
+  } catch (error) { console.error('Erro:', error) }
+  showScreen('payment-screen')
+}
 
-socket.on('bothPaid', (data) => {
-  if (isHost) {
-    document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
-    document.getElementById('startBtn').classList.remove('hidden')
-  }
-})
+function confirmPaymentManual() {
+  if (!currentTransactionId) return
+  document.getElementById('paymentStatus').innerText = '⏳ Aguardando confirmação do admin...'
+  socket.emit('paymentConfirmed', { transactionId: currentTransactionId, roomId: paymentData?.roomId, playerType: paymentData?.playerType })
+  startAdminConfirmationCheck()
+}
+
+function startAdminConfirmationCheck() {
+  paymentCheckInterval = setInterval(async () => {
+    if (!currentTransactionId) return
+    try {
+      const res = await fetch(`/api/payment/status/${currentTransactionId}`)
+      const result = await res.json()
+      console.log('📊 Status do pagamento:', result)
+      if (result.status === 'completed') {
+        clearInterval(paymentCheckInterval)
+        document.getElementById('paymentStatus').innerText = '✅ Pagamento confirmado!'
+        setTimeout(() => {
+          showScreen('wait-screen')
+          if (!room && paymentData?.roomId) room = paymentData.roomId
+          document.getElementById('waitMessage').innerText = paymentData?.playerType === 'host' ? '👑 Aguardando convidado...' : '🎲 Aguardando host iniciar...'
+        }, 2000)
+      }
+    } catch (error) { console.error('Erro:', error) }
+  }, 5000)
+}
+
+function copyPixCode() { navigator.clipboard.writeText(PIX_COPY_PASTE); alert('PIX copiado! ✅') }
+function cancelPayment() { if (paymentCheckInterval) clearInterval(paymentCheckInterval); currentTransactionId = null; paymentData = null; showScreen('menu-screen') }
 
 socket.on('roomList', (rooms) => {
   const ul = document.getElementById('rooms')
@@ -848,21 +273,21 @@ socket.on('roomList', (rooms) => {
   })
 })
 
-function joinRoom(code) {
-  socket.emit('joinRoom', code)
-}
+function joinRoom(code) { socket.emit('joinRoom', code) }
 
 socket.on('roomJoined', (data) => {
   room = data.code
   isHost = false
+  console.log('✅ Entrou na sala:', room, 'isHost:', isHost)
   showScreen('wait-screen')
   document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
   document.getElementById('startBtn').classList.add('hidden')
 })
 
-socket.on('guestJoined', () => {
+socket.on('bothPaid', (data) => {
+  console.log('📩 bothPaid recebido:', data)
   if (isHost) {
-    document.getElementById('waitMessage').innerText = '✅ Convidado entrou!'
+    document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
     document.getElementById('startBtn').classList.remove('hidden')
   }
 })
@@ -873,192 +298,31 @@ function startGame() {
 }
 
 socket.on('gameStart', (data) => {
-  hand = data.hand
-  deck = data.deckCount
+  hand = data.hand; deck = data.deckCount
   showScreen('game-screen')
-  updateTurn('🎮 Jogo Iniciado!')
-  renderHand(hand)
-  document.getElementById('action-buttons').classList.add('hidden')
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
-  requestWakeLock()
-  clearGameState()
-})
-
-socket.on('tilePlayed', (data) => {
-  hand = data.hand
-  deck = data.deckCount
-  renderHand(hand)
-  document.getElementById('myCount').innerText = hand.length
-  document.getElementById('deckCount').innerText = deck
-  renderBoard(data.board)
-  if (data.turn === myId) {
-    updateTurn('✅ SUA VEZ!')
-    myTurn = true
-    checkMoves(data.board)
-  } else {
-    updateTurn('⏳ Oponente...')
-    myTurn = false
-    document.getElementById('action-buttons').classList.add('hidden')
-    hideZones()
-  }
-})
-
-socket.on('tileBought', (data) => {
-  hand = data.hand
-  deck = data.deckCount
-  renderHand(hand)
-  document.getElementById('myCount').innerText = hand.length
-  document.getElementById('deckCount').innerText = deck
-  checkMovesAfterBuy(data.board)
 })
 
 socket.on('update', (data) => {
-  renderBoard(data.board)
-  if (data.deckCount !== undefined) {
-    deck = data.deckCount
-    document.getElementById('deckCount').innerText = deck
-  }
-  if (data.turn === myId) {
-    updateTurn('✅ SUA VEZ!')
-    myTurn = true
-    checkMoves(data.board)
-  } else {
-    updateTurn('⏳ Oponente...')
-    myTurn = false
-    document.getElementById('action-buttons').classList.add('hidden')
-    hideZones()
-  }
+  if (data.deckCount !== undefined) { deck = data.deckCount; document.getElementById('deckCount').innerText = deck }
 })
-
-function getBoardEnds(board) {
-  if (!board || board.length === 0) return { left: null, right: null }
-  const first = board[0]
-  const last = board[board.length - 1]
-  const left = Array.isArray(first) ? parseInt(first[0]) : null
-  const right = Array.isArray(last) ? parseInt(last[1]) : null
-  return { left, right }
-}
-
-function checkMoves(board) {
-  const act = document.getElementById('action-buttons')
-  const buy = act.querySelector('.btn-blue')
-  const pass = document.getElementById('passBtn')
-  const ends = getBoardEnds(board)
-  let can = board.length === 0
-  if (!can && ends.left !== null && ends.right !== null) {
-    can = hand.some(t => {
-      const v0 = parseInt(t[0])
-      const v1 = parseInt(t[1])
-      return (v0 === ends.left || v1 === ends.left || v0 === ends.right || v1 === ends.right)
-    })
-  }
-  if (can) {
-    act.classList.add('hidden')
-    showZones(board.length === 0)
-    updateTurn('✅ SUA VEZ!')
-  } else {
-    hideZones()
-    act.classList.remove('hidden')
-    if (deck > 0) {
-      buy.classList.remove('hidden')
-      pass.classList.add('hidden')
-      updateTurn('⚠️ Compre!')
-    } else {
-      buy.classList.add('hidden')
-      pass.classList.remove('hidden')
-      updateTurn('⚠️ Passe!')
-    }
-  }
-}
-
-function checkMovesAfterBuy(board) {
-  const ends = getBoardEnds(board)
-  let can = board.length === 0
-  if (!can && ends.left !== null && ends.right !== null) {
-    can = hand.some(t => {
-      const v0 = parseInt(t[0])
-      const v1 = parseInt(t[1])
-      return (v0 === ends.left || v1 === ends.left || v0 === ends.right || v1 === ends.right)
-    })
-  }
-  if (can) {
-    document.getElementById('action-buttons').classList.add('hidden')
-    showZones(board.length === 0)
-    updateTurn('✅ SUA VEZ!')
-  } else {
-    hideZones()
-    document.getElementById('action-buttons').classList.remove('hidden')
-    if (deck > 0) {
-      document.getElementById('passBtn').classList.add('hidden')
-      updateTurn('⚠️ Compre novamente!')
-    } else {
-      document.getElementById('passBtn').classList.remove('hidden')
-      updateTurn('⚠️ Passe!')
-    }
-  }
-}
-
-function buyTile() {
-  if (myTurn && room) {
-    socket.emit('buyTile', { code: room })
-    document.getElementById('action-buttons').classList.add('hidden')
-  }
-}
-
-function passTurn() {
-  if (myTurn && room) {
-    socket.emit('passTurn', { code: room })
-    document.getElementById('action-buttons').classList.add('hidden')
-  }
-}
-
-function renderHand(h) {
-  if (!h || !Array.isArray(h)) return
-  document.getElementById('hand').innerHTML = h.map((t, i) => createDomino(t[0], t[1], false, true)).join('')
-}
-
-function renderBoard(b) {
-  if (!b || !Array.isArray(b)) return
-  document.getElementById('boardTiles').innerHTML = b.map(t => {
-    if (!t || !Array.isArray(t) || t.length !== 2) return ''
-    return createDomino(t[0], t[1], true)
-  }).join('')
-  setTimeout(updateScrollArrows, 100)
-}
-
-function showZones(first) {
-  document.getElementById('dropCenter').classList.toggle('hidden', !first)
-  document.getElementById('dropLeft').classList.toggle('hidden', first)
-  document.getElementById('dropRight').classList.toggle('hidden', first)
-}
-
-function hideZones() {
-  document.getElementById('dropCenter').classList.add('hidden')
-  document.getElementById('dropLeft').classList.add('hidden')
-  document.getElementById('dropRight').classList.add('hidden')
-}
-
-function updateTurn(m) {
-  const el = document.getElementById('turn')
-  el.innerText = m
-  el.classList.toggle('active', m.includes('SUA VEZ'))
-}
 
 socket.on('error', (data) => { alert('Erro: ' + data.message) })
-socket.on('gameOver', () => { 
-  clearGameState()
-  alert('🏆 Fim de jogo!')
-  location.reload() 
-})
+socket.on('gameOver', () => { alert('🏆 Fim de jogo!'); location.reload() })
 
-document.addEventListener('DOMContentLoaded', () => {
-  const boardContainer = document.getElementById('boardContainer')
-  if (boardContainer) {
-    boardContainer.addEventListener('scroll', updateScrollArrows)
-    window.addEventListener('resize', updateScrollArrows)
-  }
-})
+function allowDrop(e) { e.preventDefault() }
+function drop(e, side) { e.preventDefault(); if (!draggedTile) return; socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side }); draggedTile = null }
+function handleDrag(e) { if (!myTurn) return; draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) } }
+function buyTile() { if (myTurn && room) { socket.emit('buyTile', { code: room }) } }
+function passTurn() { if (myTurn && room) { socket.emit('passTurn', { code: room }) } }
+function renderHand(h) { if (!h || !Array.isArray(h)) return; document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false, true)).join('') }
+function renderBoard(b) { if (!b || !Array.isArray(b)) return; document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('') }
+function createDomino(v1, v2, horizontal = false, draggable = false) {
+  const n1 = parseInt(v1), n2 = parseInt(v2)
+  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
+  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ' + (draggable ? 'draggable="true" ondragstart="handleDrag(event)"' : '') + ' data-v1="' + n1 + '" data-v2="' + n2 + '"><div class="domino-face top v' + n1 + '">' + pips + '</div><div class="domino-face bottom v' + n2 + '">' + pips + '</div></div>'
+}
 </script>
 </body>
 </html>

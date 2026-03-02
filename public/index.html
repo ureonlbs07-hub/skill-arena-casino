@@ -568,6 +568,12 @@ function updateScrollArrows() {
 async function createPayment(data) {
   paymentData = data
   
+  // ✅ SALVAR O ROOM ANTES DE IR PARA TELA DE PAGAMENTO
+  if (data.roomId) {
+    room = data.roomId
+    console.log('💾 Room salvo antes do pagamento:', room)
+  }
+  
   try {
     const res = await fetch('/api/payment/create', {
       method: 'POST',
@@ -597,17 +603,13 @@ function confirmPaymentManual() {
   document.getElementById('paymentStatus').innerText = '⏳ Aguardando confirmação do admin...'
   document.getElementById('paymentStatus').style.color = '#ffc107'
   
-  // ✅ Notifica admin via WebSocket
   socket.emit('paymentConfirmed', {
     transactionId: currentTransactionId,
     roomId: paymentData?.roomId,
     playerType: paymentData?.playerType
   })
   
-  // ✅ Inicia polling para verificar se admin confirmou
   startAdminConfirmationCheck()
-  
-  // ❌ NÃO vai para wait-screen! Fica na tela de pagamento!
 }
 
 // ✅ NOVA FUNÇÃO: Verifica se admin confirmou (a cada 5 segundos)
@@ -621,7 +623,6 @@ function startAdminConfirmationCheck() {
       
       console.log('📊 Status do pagamento:', result)
       
-      // ✅ SÓ libera se status for 'completed'
       if (result.status === 'completed') {
         clearInterval(paymentCheckInterval)
         document.getElementById('paymentStatus').innerText = '✅ Pagamento confirmado!'
@@ -629,10 +630,17 @@ function startAdminConfirmationCheck() {
         
         setTimeout(() => {
           showScreen('wait-screen')
+          
+          // ✅ GARANTIR QUE O ROOM ESTÁ DEFINIDO
+          if (!room && paymentData?.roomId) {
+            room = paymentData.roomId
+          }
+          
           if (paymentData?.playerType === 'host') {
             document.getElementById('waitMessage').innerText = '👑 Aguardando convidado...'
+            document.getElementById('myRoomCode').innerText = 'Sua sala: ' + room
           } else {
-            document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
+            document.getElementById('waitMessage').innerText = '🎲 Aguardando host iniciar...'
           }
         }, 2000)
       }
@@ -776,6 +784,13 @@ socket.on('roomCreated', (data) => {
 
 socket.on('paymentRequired', (data) => {
   currentTransactionId = null
+  
+  // ✅ SALVAR ROOM ANTES DE CRIAR PAGAMENTO
+  if (data.roomId) {
+    room = data.roomId
+    console.log('💾 Room salvo no paymentRequired:', room)
+  }
+  
   createPayment(data)
 })
 

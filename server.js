@@ -38,6 +38,29 @@ app.use('/api/game', gameRoutes)
 // ✅ INICIALIZAR IO NAS ROTAS DE PAGAMENTO
 paymentRoutes.setIO(io)
 
+// ✅ NOVA ROTA: Host verifica status dos pagamentos (POLLING)
+app.get('/api/room/status/:code', async (req, res) => {
+  try {
+    const { code } = req.params
+    const result = await db.query(
+      `SELECT host_paid, guest_paid FROM rooms WHERE code = $1`,
+      [code]
+    )
+    
+    if (result.rows.length === 0) {
+      return res.json({ hostPaid: false, guestPaid: false })
+    }
+    
+    res.json({
+      hostPaid: result.rows[0].host_paid,
+      guestPaid: result.rows[0].guest_paid
+    })
+  } catch (error) {
+    console.error('Erro ao verificar status da sala:', error)
+    res.json({ hostPaid: false, guestPaid: false })
+  }
+})
+
 app.get('/api/monetization-status', async (req, res) => {
   const settings = await adminService.getAllSettings()
   res.json({

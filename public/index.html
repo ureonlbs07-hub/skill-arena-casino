@@ -208,7 +208,15 @@ socket.on('roomCreated', (data) => {
 socket.on('paymentRequired', (data) => {
   console.log('💰 Pagamento necessário:', data)
   currentTransactionId = null
-  if (data.roomId) { room = data.roomId; console.log('💾 Room salvo:', room) }
+  
+  // ✅ DEFINIR isHost = true AQUI!
+  isHost = true
+  console.log('👑 isHost definido como TRUE')
+  
+  if (data.roomId) { 
+    room = data.roomId
+    console.log('💾 Room salvo:', room) 
+  }
   createPayment(data)
 })
 
@@ -285,8 +293,9 @@ socket.on('roomJoined', (data) => {
 })
 
 socket.on('bothPaid', (data) => {
-  console.log('📩 bothPaid recebido:', data)
+  console.log('📩 bothPaid recebido:', data, 'isHost:', isHost)
   if (isHost) {
+    console.log('✅ Host recebeu bothPaid, liberando botão!')
     document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
     document.getElementById('startBtn').classList.remove('hidden')
   }

@@ -189,8 +189,7 @@ io.on('connection', (socket) => {
       turn: null
     }
     
-    console.log('🏠 Sala criada:', room.code)
-    console.log('📊 Host socket.id:', socket.id)
+    console.log('🏠 Sala criada:', room.code, 'Host socket.id:', socket.id)
     
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
@@ -241,8 +240,13 @@ io.on('connection', (socket) => {
 
   socket.on('startGame', async (code) => {
     const room = rooms[code]
+    console.log('🎮 startGame recebido - code:', code, 'socket.id:', socket.id, 'room.host:', room?.host)
+    
     if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
-    if (room.host !== socket.id) return socket.emit('error', { message: 'Apenas host pode iniciar' })
+    if (room.host !== socket.id) {
+      console.log('❌ Não é o host! room.host:', room.host, 'socket.id:', socket.id)
+      return socket.emit('error', { message: 'Apenas host pode iniciar' })
+    }
     if (!room.guest) return socket.emit('error', { message: 'Aguarde o convidado' })
     
     const settings = await adminService.getAllSettings()
@@ -267,7 +271,10 @@ io.on('connection', (socket) => {
     rooms[code].turn = room.host
 
     console.log('🎮 Jogo iniciado:', code)
+    console.log('🎮 Mão do host:', rooms[code].hands[room.host])
+    console.log('🎮 Mão do guest:', rooms[code].hands[room.guest])
 
+    // ✅ HOST recebe isHost: true
     io.to(room.host).emit('gameStart', {
       hand: rooms[code].hands[room.host],
       isHost: true,
@@ -275,6 +282,7 @@ io.on('connection', (socket) => {
       opponent: users[room.guest]?.username || 'Oponente'
     })
 
+    // ✅ GUEST recebe isHost: false
     io.to(room.guest).emit('gameStart', {
       hand: rooms[code].hands[room.guest],
       isHost: false,

@@ -134,26 +134,45 @@ let touchStartX = 0, touchStartY = 0
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
+// ============================================
+// ✅ ESTADO DO JOGO (LOCALSTORAGE)
+// ============================================
 function saveGameState() {
   const state = { room, myId, isHost, hand, deck, myTurn, timestamp: Date.now() }
   localStorage.setItem('dominoGameState', JSON.stringify(state))
 }
 
-function loadGameState() {
+// ✅ CORRIGIDO: Agora é async e valida no servidor
+async function loadGameState() {
   const saved = localStorage.getItem('dominoGameState')
   if (saved) {
     try {
       const state = JSON.parse(saved)
       if (Date.now() - state.timestamp < 300000) {
-        room = state.room
-        myId = state.myId
-        isHost = state.isHost
-        hand = state.hand || []
-        deck = state.deck || 14
-        myTurn = state.myTurn || false
-        return true
+        // ✅ VALIDAR SE SALA EXISTE NO SERVIDOR
+        try {
+          const res = await fetch(`/api/room/${state.room}`)
+          const data = await res.json()
+          
+          if (data.exists) {
+            room = state.room
+            myId = state.myId
+            isHost = state.isHost
+            hand = state.hand || []
+            deck = state.deck || 14
+            myTurn = state.myTurn || false
+            console.log('✅ Estado recuperado:', state)
+            return true
+          } else {
+            console.log('❌ Sala não existe, limpando estado')
+            clearGameState()
+          }
+        } catch (e) {
+          console.log('❌ Erro ao validar sala, limpando estado')
+          clearGameState()
+        }
       }
-    } catch (e) {}
+    } catch (e) { console.error('Erro ao carregar estado:', e) }
   }
   return false
 }
@@ -170,6 +189,9 @@ window.addEventListener('beforeunload', (e) => {
   }
 })
 
+// ============================================
+// ✅ NAVEGAÇÃO ENTRE TELAS
+// ============================================
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
@@ -193,15 +215,21 @@ function startHostPaymentCheck() {
   }, 2000)
 }
 
+// ============================================
+// ✅ REGISTRO E CONEXÃO
+// ============================================
 function register() {
   const u = document.getElementById('username').value
   if (!u) return alert('Nome!')
   socket.emit('register', u)
 }
 
-socket.on('registered', (data) => { 
+// ✅ CORRIGIDO: Agora é async e usa await
+socket.on('registered', async (data) => { 
   myId = data.id
-  const recovered = loadGameState()
+  console.log('✅ Registrado:', myId)
+  
+  const recovered = await loadGameState()
   if (recovered && room) {
     socket.emit('joinRoom', room)
     showScreen('wait-screen')
@@ -211,12 +239,9 @@ socket.on('registered', (data) => {
   showScreen('menu-screen')
 })
 
+// ✅ CORRIGIDO: Não tenta recuperar aqui
 socket.on('connect', () => {
   console.log('🔌 Socket conectado:', socket.id)
-  const recovered = loadGameState()
-  if (recovered && room && myId) {
-    socket.emit('register', 'reconnect')
-  }
 })
 
 socket.on('disconnect', () => {
@@ -224,6 +249,9 @@ socket.on('disconnect', () => {
   saveGameState()
 })
 
+// ============================================
+// ✅ SALAS
+// ============================================
 function createRoom() { socket.emit('createRoom') }
 
 socket.on('roomCreated', (data) => {
@@ -235,6 +263,36 @@ socket.on('roomCreated', (data) => {
   document.getElementById('startBtn').classList.add('hidden')
 })
 
+socket.on('roomList', (rooms) => {
+  const ul = document.getElementById('rooms')
+  ul.innerHTML = ''
+  if (rooms.length === 0) { ul.innerHTML = '<li style="color:#888">Nenhuma</li>'; return }
+  rooms.forEach(r => {
+    const st = r.players >= 2 ? '🔴 Cheia' : '🟡 ' + r.players + '/2'
+    ul.innerHTML += '<li><span><b>' + r.code + '</b> (' + st + ')</span><button class="btn-blue" style="width:auto;padding:5px 10px;" ' + (r.players >= 2 ? 'disabled' : '') + ' onclick="joinRoom(\'' + r.code + '\')">Entrar</button></li>'
+  })
+})
+
+function joinRoom(code) { socket.emit('joinRoom', code) }
+
+socket.on('roomJoined', (data) => {
+  room = data.code; isHost = false
+  saveGameState()
+  showScreen('wait-screen')
+  document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
+  document.getElementById('startBtn').classList.add('hidden')
+})
+
+socket.on('bothPaid', (data) => {
+  if (isHost && room) {
+    document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
+    document.getElementById('startBtn').classList.remove('hidden')
+  }
+})
+
+// ============================================
+// ✅ PAGAMENTO PIX
+// ============================================
 socket.on('paymentRequired', (data) => {
   currentTransactionId = null
   isHost = (data.playerType === 'host')
@@ -288,40 +346,18 @@ function startAdminConfirmationCheck() {
 }
 
 function copyPixCode() { navigator.clipboard.writeText(PIX_COPY_PASTE); alert('PIX copiado! ✅') }
+
 function cancelPayment() { 
   if (paymentCheckInterval) clearInterval(paymentCheckInterval)
-  currentTransactionId = null; paymentData = null
+  currentTransactionId = null
+  paymentData = null
   clearGameState()
   showScreen('menu-screen')
 }
 
-socket.on('roomList', (rooms) => {
-  const ul = document.getElementById('rooms')
-  ul.innerHTML = ''
-  if (rooms.length === 0) { ul.innerHTML = '<li style="color:#888">Nenhuma</li>'; return }
-  rooms.forEach(r => {
-    const st = r.players >= 2 ? '🔴 Cheia' : '🟡 ' + r.players + '/2'
-    ul.innerHTML += '<li><span><b>' + r.code + '</b> (' + st + ')</span><button class="btn-blue" style="width:auto;padding:5px 10px;" ' + (r.players >= 2 ? 'disabled' : '') + ' onclick="joinRoom(\'' + r.code + '\')">Entrar</button></li>'
-  })
-})
-
-function joinRoom(code) { socket.emit('joinRoom', code) }
-
-socket.on('roomJoined', (data) => {
-  room = data.code; isHost = false
-  saveGameState()
-  showScreen('wait-screen')
-  document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
-  document.getElementById('startBtn').classList.add('hidden')
-})
-
-socket.on('bothPaid', (data) => {
-  if (isHost && room) {
-    document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
-    document.getElementById('startBtn').classList.remove('hidden')
-  }
-})
-
+// ============================================
+// ✅ JOGO
+// ============================================
 function startGame() {
   if (!room) return alert('Erro!')
   if (!isHost) return alert('Apenas host!')
@@ -407,11 +443,30 @@ socket.on('tileBought', (data) => {
   checkMoves(data.board)
 })
 
-socket.on('error', (data) => { alert('Erro: ' + data.message) })
-socket.on('gameOver', () => { alert('🏆 Fim!'); clearGameState(); location.reload() })
+// ✅ CORRIGIDO: Limpa estado se erro for de sala
+socket.on('error', (data) => { 
+  console.log('❌ Erro:', data.message)
+  if (data.message.includes('não encontrada') || 
+      data.message.includes('não existe') ||
+      data.message.includes('Sala')) {
+    console.log('⚠️ Erro de sala, limpando estado')
+    clearGameState()
+    showScreen('menu-screen')
+  }
+  alert('Erro: ' + data.message)
+})
 
+socket.on('gameOver', () => { 
+  alert('🏆 Fim!')
+  clearGameState()
+  location.reload() 
+})
+
+// ============================================
 // ✅ DRAG AND DROP (DESKTOP)
+// ============================================
 function allowDrop(e) { e.preventDefault() }
+
 function drop(e, side) { 
   e.preventDefault()
   if (!draggedTile) return
@@ -426,6 +481,7 @@ function drop(e, side) {
     draggedElement = null
   }
 }
+
 function handleDrag(e) { 
   if (!myTurn) return
   draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) }
@@ -433,7 +489,9 @@ function handleDrag(e) {
   if (draggedElement) draggedElement.classList.add('dragging')
 }
 
+// ============================================
 // ✅ TOUCH EVENTS (MOBILE)
+// ============================================
 function handleTouchStart(e) {
   if (!myTurn) return
   e.preventDefault()
@@ -497,8 +555,14 @@ function isOverElement(x, y, element) {
 function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
+// ============================================
+// ✅ RENDERIZAÇÃO
+// ============================================
 function renderHand(h) {
-  if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
+  if (!h || !Array.isArray(h) || h.length === 0) { 
+    document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'
+    return 
+  }
   document.getElementById('hand').innerHTML = h.map(t => {
     return '<div class="domino" ' + 
       'draggable="' + myTurn + '" ' +
@@ -529,7 +593,6 @@ function hideZones() {
   document.getElementById('dropRight').classList.add('hidden')
 }
 
-// ✅ CORRIGIDO: checkMoves agora mostra drop zones para TODOS os jogadores
 function checkMoves(board) {
   console.log('🔍 checkMoves - board:', board, 'hand:', hand, 'myTurn:', myTurn)
   

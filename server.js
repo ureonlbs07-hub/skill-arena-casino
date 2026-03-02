@@ -30,11 +30,9 @@ let rooms = {}
 let users = {}
 let adminSessions = {}
 
+// ✅ ROTAS ESPECÍFICAS PRIMEIRO
 app.use('/api/payment', paymentRoutes)
-app.use('/api/admin', adminRoutes)
 app.use('/api/game', gameRoutes)
-
-paymentRoutes.setIO(io)
 
 // ✅ Rota para verificar status da sala (POLLING)
 app.get('/api/room/status/:code', async (req, res) => {
@@ -67,13 +65,13 @@ app.get('/api/room/status/:code', async (req, res) => {
   }
 })
 
-// ✅ Rota para admin confirmar pagamento (ATUALIZA MEMÓRIA + BANCO)
+// ✅ Rota para admin confirmar pagamento (ANTES de app.use('/api/admin'))
 app.post('/api/admin/confirm-payment', async (req, res) => {
   try {
     const { transactionId, token } = req.body
     
     console.log('💰 Admin confirmando pagamento:', transactionId)
-    console.log('📡 Token recebido:', token)
+    console.log('📡 Token recebido:', token ? 'presente' : 'ausente')
     console.log('📡 Admin sessions:', Object.keys(adminSessions))
     
     // Verificar token de admin
@@ -136,6 +134,9 @@ app.post('/api/admin/confirm-payment', async (req, res) => {
     res.status(500).json({ success: false, error: error.message })
   }
 })
+
+// ✅ ROTAS GENÉRICAS DEPOIS
+app.use('/api/admin', adminRoutes)
 
 app.get('/api/monetization-status', async (req, res) => {
   const settings = await adminService.getAllSettings()

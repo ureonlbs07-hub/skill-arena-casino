@@ -209,7 +209,6 @@ socket.on('paymentRequired', (data) => {
   console.log('💰 Pagamento necessário:', data)
   currentTransactionId = null
   
-  // ✅ DEFINIR isHost = true AQUI!
   isHost = true
   console.log('👑 isHost definido como TRUE')
   
@@ -292,12 +291,16 @@ socket.on('roomJoined', (data) => {
   document.getElementById('startBtn').classList.add('hidden')
 })
 
+// ✅ CORRIGIDO: bothPaid só libera botão para HOST
 socket.on('bothPaid', (data) => {
   console.log('📩 bothPaid recebido:', data, 'isHost:', isHost)
   if (isHost) {
-    console.log('✅ Host recebeu bothPaid, liberando botão!')
+    console.log('✅ HOST recebeu bothPaid, liberando botão!')
     document.getElementById('waitMessage').innerText = '✅ Ambos pagaram! Pode iniciar.'
     document.getElementById('startBtn').classList.remove('hidden')
+  } else {
+    console.log('⏳ Guest recebeu bothPaid, aguardando host...')
+    document.getElementById('waitMessage').innerText = '🎲 Aguardando host iniciar...'
   }
 })
 
@@ -306,15 +309,79 @@ function startGame() {
   socket.emit('startGame', room)
 }
 
+// ✅ CORRIGIDO: gameStart agora renderiza as mãos
 socket.on('gameStart', (data) => {
-  hand = data.hand; deck = data.deckCount
+  console.log('🎮 gameStart recebido:', data)
+  hand = data.hand || []
+  deck = data.deckCount || 14
+  isHost = data.isHost || false
+  
+  console.log('🎮 Mão recebida:', hand)
+  console.log('🎮 Deck count:', deck)
+  console.log('🎮 isHost:', isHost)
+  
   showScreen('game-screen')
+  
+  // ✅ RENDERIZAR MÃO
+  renderHand(hand)
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
+  
+  // ✅ Atualizar turno
+  if (isHost) {
+    document.getElementById('turn').innerText = '🎮 Sua vez!'
+    document.getElementById('turn').classList.add('active')
+  } else {
+    document.getElementById('turn').innerText = '⏳ Aguardando oponente...'
+    document.getElementById('turn').classList.remove('active')
+  }
 })
 
 socket.on('update', (data) => {
-  if (data.deckCount !== undefined) { deck = data.deckCount; document.getElementById('deckCount').innerText = deck }
+  console.log('📡 Update recebido:', data)
+  if (data.board) renderBoard(data.board)
+  if (data.deckCount !== undefined) { 
+    deck = data.deckCount
+    document.getElementById('deckCount').innerText = deck 
+  }
+  if (data.turn === myId) {
+    document.getElementById('turn').innerText = '✅ SUA VEZ!'
+    document.getElementById('turn').classList.add('active')
+    myTurn = true
+  } else {
+    document.getElementById('turn').innerText = '⏳ Oponente...'
+    document.getElementById('turn').classList.remove('active')
+    myTurn = false
+  }
+})
+
+socket.on('tilePlayed', (data) => {
+  console.log('🎴 tilePlayed recebido:', data)
+  hand = data.hand || []
+  deck = data.deckCount || 14
+  renderHand(hand)
+  document.getElementById('myCount').innerText = hand.length
+  document.getElementById('deckCount').innerText = deck
+  renderBoard(data.board)
+  
+  if (data.turn === myId) {
+    document.getElementById('turn').innerText = '✅ SUA VEZ!'
+    document.getElementById('turn').classList.add('active')
+    myTurn = true
+  } else {
+    document.getElementById('turn').innerText = '⏳ Oponente...'
+    document.getElementById('turn').classList.remove('active')
+    myTurn = false
+  }
+})
+
+socket.on('tileBought', (data) => {
+  console.log('🛒 tileBought recebido:', data)
+  hand = data.hand || []
+  deck = data.deckCount || 14
+  renderHand(hand)
+  document.getElementById('myCount').innerText = hand.length
+  document.getElementById('deckCount').innerText = deck
 })
 
 socket.on('error', (data) => { alert('Erro: ' + data.message) })
@@ -325,8 +392,26 @@ function drop(e, side) { e.preventDefault(); if (!draggedTile) return; socket.em
 function handleDrag(e) { if (!myTurn) return; draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) } }
 function buyTile() { if (myTurn && room) { socket.emit('buyTile', { code: room }) } }
 function passTurn() { if (myTurn && room) { socket.emit('passTurn', { code: room }) } }
-function renderHand(h) { if (!h || !Array.isArray(h)) return; document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false, true)).join('') }
-function renderBoard(b) { if (!b || !Array.isArray(b)) return; document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('') }
+
+// ✅ RENDERIZAR MÃO
+function renderHand(h) {
+  console.log('🎴 renderHand:', h)
+  if (!h || !Array.isArray(h) || h.length === 0) {
+    console.log('⚠️ Mão vazia ou inválida!')
+    document.getElementById('hand').innerHTML = '<p style="color:#888">Nenhuma peça</p>'
+    return
+  }
+  document.getElementById('hand').innerHTML = h.map(t => {
+    console.log('🎴 Renderizando peça:', t)
+    return createDomino(t[0], t[1], false, true)
+  }).join('')
+}
+
+function renderBoard(b) {
+  if (!b || !Array.isArray(b)) return
+  document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
+}
+
 function createDomino(v1, v2, horizontal = false, draggable = false) {
   const n1 = parseInt(v1), n2 = parseInt(v2)
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'

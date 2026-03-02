@@ -30,18 +30,24 @@ let rooms = {}
 let users = {}
 let adminSessions = {}
 
-// ✅ ROTAS DEFINIDAS APENAS UMA VEZ
 app.use('/api/payment', paymentRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/game', gameRoutes)
 
-// ✅ INICIALIZAR IO NAS ROTAS DE PAGAMENTO
 paymentRoutes.setIO(io)
 
-// ✅ NOVA ROTA: Host verifica status dos pagamentos (POLLING)
+// ✅ Rota para verificar status da sala (POLLING)
 app.get('/api/room/status/:code', async (req, res) => {
   try {
     const { code } = req.params
+    
+    if (rooms[code]) {
+      return res.json({
+        hostPaid: rooms[code].hostPaid || false,
+        guestPaid: rooms[code].guestPaid || false
+      })
+    }
+    
     const result = await db.query(
       `SELECT host_paid, guest_paid FROM rooms WHERE code = $1`,
       [code]
@@ -58,6 +64,76 @@ app.get('/api/room/status/:code', async (req, res) => {
   } catch (error) {
     console.error('Erro ao verificar status da sala:', error)
     res.json({ hostPaid: false, guestPaid: false })
+  }
+})
+
+// ✅ Rota para admin confirmar pagamento (ATUALIZA MEMÓRIA + BANCO)
+app.post('/api/admin/confirm-payment', async (req, res) => {
+  try {
+    const { transactionId, token } = req.body
+    
+    console.log('💰 Admin confirmando pagamento:', transactionId)
+    console.log('📡 Token recebido:', token)
+    console.log('📡 Admin sessions:', Object.keys(adminSessions))
+    
+    // Verificar token de admin
+    if (!token || !adminSessions[token]) {
+      console.log('❌ Token inválido:', token)
+      return res.status(401).json({ success: false, error: 'Não autorizado' })
+    }
+    
+    // Confirmar no banco
+    await paymentService.confirmPayment(transactionId)
+    
+    // Buscar dados da transação
+    const txResult = await db.query(
+      `SELECT room_code, player_type FROM transactions WHERE id = $1`,
+      [transactionId]
+    )
+    
+    if (txResult.rows.length === 0) {
+      return res.json({ success: false, error: 'Transação não encontrada' })
+    }
+    
+    const roomCode = txResult.rows[0].room_code
+    const playerType = txResult.rows[0].player_type
+    
+    console.log('📊 Sala:', roomCode, 'Player Type:', playerType)
+    
+    // ✅ ATUALIZAR BANCO
+    const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
+    await db.query(
+      `UPDATE rooms SET ${column} = TRUE WHERE code = $1`,
+      [roomCode]
+    )
+    console.log('✅ rooms.' + column + ' atualizado para TRUE (banco)')
+    
+    // ✅ ATUALIZAR MEMÓRIA
+    if (rooms[roomCode]) {
+      if (playerType === 'host') {
+        rooms[roomCode].hostPaid = true
+      } else {
+        rooms[roomCode].guestPaid = true
+      }
+      console.log('✅ rooms[' + roomCode + '] atualizado em memória')
+      console.log('📊 hostPaid:', rooms[roomCode].hostPaid, 'guestPaid:', rooms[roomCode].guestPaid)
+    } else {
+      console.log('⚠️ Sala não encontrada em memória:', roomCode)
+    }
+    
+    // ✅ VERIFICAR SE AMBOS PAGARAM
+    const room = rooms[roomCode]
+    if (room && room.hostPaid && room.guestPaid && room.host) {
+      console.log('✅ AMBOS PAGARAM! Emitindo bothPaid para:', room.host)
+      io.to(room.host).emit('bothPaid', { roomId: roomCode })
+    } else {
+      console.log('⏳ Aguardando ambos pagarem... hostPaid:', room?.hostPaid, 'guestPaid:', room?.guestPaid)
+    }
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('❌ Erro ao confirmar pagamento:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
@@ -79,16 +155,12 @@ app.get('/admin', (req, res) => {
   res.sendFile(__dirname + '/public/admin.html')
 })
 
-// ============================================
-// 🔥 AUTO-CRIAR TABELAS NO STARTUP
-// ============================================
 async function initDatabase() {
   try {
     const schema = fs.readFileSync('./database/schema.sql', 'utf8')
     await db.query(schema)
     console.log('✅ Tabelas criadas/atualizadas!')
     
-    // ✅ ADICIONAR COLUNA player_type SE NÃO EXISTIR
     await db.query(`
       ALTER TABLE transactions 
       ADD COLUMN IF NOT EXISTS player_type VARCHAR(20)
@@ -205,9 +277,6 @@ io.on('connection', (socket) => {
     rooms[code].turn = room.host
 
     console.log('🎮 Jogo iniciado:', code)
-    console.log('🎮 Turno inicial:', rooms[code].turn)
-    console.log('🎮 Host:', rooms[code].host)
-    console.log('🎮 Guest:', rooms[code].guest)
 
     io.to(room.host).emit('gameStart', {
       hand: rooms[code].hands[room.host],
@@ -342,9 +411,6 @@ function sendRoomList() {
   io.emit('roomList', list)
 }
 
-// ============================================
-// 🚀 INICIAR SERVIDOR
-// ============================================
 const PORT = process.env.PORT || 3000
 
 initDatabase().then(() => {

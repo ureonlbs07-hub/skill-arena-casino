@@ -45,7 +45,6 @@ router.get('/status/:transactionId', async (req, res) => {
   }
 })
 
-// ✅ CORRIGIDO: Confirmar pagamento E notificar host se ambos pagaram
 router.post('/confirm', async (req, res) => {
   try {
     const { transactionId } = req.body
@@ -53,10 +52,8 @@ router.post('/confirm', async (req, res) => {
     console.log('💰 Confirmando pagamento:', transactionId)
     console.log('📡 IO está definido:', io ? 'SIM' : 'NÃO')
     
-    // 1. Confirmar pagamento no banco
     await paymentService.confirmPayment(transactionId)
     
-    // 2. Buscar dados da transação
     const txResult = await db.query(
       `SELECT room_code FROM transactions WHERE id = $1`,
       [transactionId]
@@ -70,7 +67,6 @@ router.post('/confirm', async (req, res) => {
     const roomCode = txResult.rows[0].room_code
     console.log('📊 Código da sala:', roomCode)
     
-    // 3. Buscar sala do banco
     const roomResult = await db.query(
       `SELECT * FROM rooms WHERE code = $1`,
       [roomCode]
@@ -88,7 +84,6 @@ router.post('/confirm', async (req, res) => {
     console.log('📊 host_paid:', room.host_paid)
     console.log('📊 guest_paid:', room.guest_paid)
     
-    // 4. ✅ Se ambos pagaram, notificar host via socket
     if (room.host_paid && room.guest_paid && room.host_id && io) {
       console.log('✅ AMBOS PAGARAM!')
       console.log('✅ Emitindo bothPaid para host:', room.host_id)
@@ -102,4 +97,32 @@ router.post('/confirm', async (req, res) => {
     
     res.json({ success: true })
   } catch (error) {
-    console.error('❌ Erro ao confirmar
+    console.error('Erro ao confirmar pagamento:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+router.post('/cancel', async (req, res) => {
+  try {
+    const { transactionId } = req.body
+    await paymentService.cancelPayment(transactionId)
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Erro ao cancelar pagamento:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+router.get('/pending', async (req, res) => {
+  try {
+    console.log('🔧 /api/payment/pending chamado')
+    const transactions = await paymentService.getPendingPayments()
+    console.log('📊 Pendentes encontrados:', transactions.length)
+    res.json({ transactions })
+  } catch (error) {
+    console.error('Erro ao listar pendentes:', error)
+    res.status(500).json({ success: false, error: error.message, transactions: [] })
+  }
+})
+
+module.exports = router

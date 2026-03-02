@@ -45,6 +45,7 @@ router.get('/status/:transactionId', async (req, res) => {
   }
 })
 
+// ✅ CORRIGIDO: Atualiza rooms.host_paid ou rooms.guest_paid
 router.post('/confirm', async (req, res) => {
   try {
     const { transactionId } = req.body
@@ -52,10 +53,12 @@ router.post('/confirm', async (req, res) => {
     console.log('💰 Confirmando pagamento:', transactionId)
     console.log('📡 IO está definido:', io ? 'SIM' : 'NÃO')
     
+    // 1. Confirmar pagamento no banco
     await paymentService.confirmPayment(transactionId)
     
+    // 2. ✅ Buscar dados da transação (INCLUINDO player_type)
     const txResult = await db.query(
-      `SELECT room_code FROM transactions WHERE id = $1`,
+      `SELECT room_code, player_type FROM transactions WHERE id = $1`,
       [transactionId]
     )
     
@@ -65,8 +68,20 @@ router.post('/confirm', async (req, res) => {
     }
     
     const roomCode = txResult.rows[0].room_code
-    console.log('📊 Código da sala:', roomCode)
+    const playerType = txResult.rows[0].player_type
     
+    console.log('📊 Sala:', roomCode)
+    console.log('📊 Player Type:', playerType)
+    
+    // 3. ✅ ATUALIZAR rooms.host_paid ou rooms.guest_paid
+    const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
+    await db.query(
+      `UPDATE rooms SET ${column} = TRUE WHERE code = $1`,
+      [roomCode]
+    )
+    console.log('✅ rooms.' + column + ' atualizado para TRUE')
+    
+    // 4. Buscar sala atualizada
     const roomResult = await db.query(
       `SELECT * FROM rooms WHERE code = $1`,
       [roomCode]
@@ -84,6 +99,7 @@ router.post('/confirm', async (req, res) => {
     console.log('📊 host_paid:', room.host_paid)
     console.log('📊 guest_paid:', room.guest_paid)
     
+    // 5. ✅ Se ambos pagaram, notificar host via socket
     if (room.host_paid && room.guest_paid && room.host_id && io) {
       console.log('✅ AMBOS PAGARAM!')
       console.log('✅ Emitindo bothPaid para host:', room.host_id)
@@ -97,7 +113,7 @@ router.post('/confirm', async (req, res) => {
     
     res.json({ success: true })
   } catch (error) {
-    console.error('Erro ao confirmar pagamento:', error)
+    console.error('❌ Erro ao confirmar pagamento:', error)
     res.status(500).json({ success: false, error: error.message })
   }
 })

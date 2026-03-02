@@ -3,7 +3,15 @@ const router = express.Router()
 const paymentService = require('./payment.service')
 const db = require('../../config/database')
 
-// ✅ Cria transação
+// ✅ Variável para armazenar o io
+let io = null
+
+// ✅ Função para setar o io
+router.setIO = (socketIO) => {
+  io = socketIO
+  console.log('✅ IO inicializado nas rotas de pagamento')
+}
+
 router.post('/create', async (req, res) => {
   try {
     const { roomId, userId, amount, playerType } = req.body
@@ -28,7 +36,6 @@ router.post('/create', async (req, res) => {
   }
 })
 
-// ✅ Verifica status da transação
 router.get('/status/:transactionId', async (req, res) => {
   try {
     const { transactionId } = req.params
@@ -42,12 +49,13 @@ router.get('/status/:transactionId', async (req, res) => {
   }
 })
 
-// ✅ Admin confirma pagamento
 router.post('/confirm', async (req, res) => {
   try {
     const { transactionId } = req.body
     
-    await paymentService.confirmPayment(transactionId)
+    console.log('💰 Confirmando pagamento:', transactionId, 'IO:', io ? 'definido' : 'NÃO DEFINIDO')
+    
+    await paymentService.confirmPayment(transactionId, io)
     
     res.json({ success: true })
   } catch (error) {
@@ -56,7 +64,19 @@ router.post('/confirm', async (req, res) => {
   }
 })
 
-// ✅ Lista pagamentos pendentes
+router.post('/cancel', async (req, res) => {
+  try {
+    const { transactionId } = req.body
+    
+    await paymentService.cancelPayment(transactionId)
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Erro ao cancelar pagamento:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
 router.get('/pending', async (req, res) => {
   try {
     console.log('🔧 /api/payment/pending chamado')

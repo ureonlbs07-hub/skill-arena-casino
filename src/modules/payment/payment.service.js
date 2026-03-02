@@ -66,7 +66,8 @@ class PaymentService {
     )
   }
 
-  async confirmPayment(transactionId) {
+  // ✅ CORRIGIDO: Verifica se ambos pagaram e emite evento
+  async confirmPayment(transactionId, io) {
     console.log('💰 Confirmando pagamento:', transactionId)
     
     await db.query(
@@ -83,7 +84,25 @@ class PaymentService {
       const { room_code, user_id } = result.rows[0]
       console.log('💰 Pagamento confirmado - Sala:', room_code, 'User:', user_id)
       
-      await this.markRoomPaid(room_code, 'host')
+      // ✅ Buscar sala para verificar se ambos pagaram
+      const roomResult = await db.query(
+        `SELECT * FROM rooms WHERE code = $1`,
+        [room_code]
+      )
+      
+      if (roomResult.rows.length > 0) {
+        const room = roomResult.rows[0]
+        
+        // ✅ Verifica se ambos pagaram
+        if (room.host_paid && room.guest_paid) {
+          console.log('✅ Ambos pagaram! Notificando host:', room.host_id)
+          
+          // ✅ Emite bothPaid para o host
+          if (room.host_id) {
+            io.to(room.host_id).emit('bothPaid', { roomId: room_code })
+          }
+        }
+      }
     }
   }
 
@@ -123,6 +142,17 @@ class PaymentService {
       console.error('❌ Erro getTransactionStatus:', error)
       return { paid: false, status: 'error' }
     }
+  }
+
+  async cancelPayment(transactionId) {
+    console.log('❌ Cancelando pagamento:', transactionId)
+    
+    await db.query(
+      `UPDATE transactions SET status = 'cancelled' WHERE id = $1`,
+      [transactionId]
+    )
+    
+    console.log('✅ Pagamento cancelado:', transactionId)
   }
 }
 

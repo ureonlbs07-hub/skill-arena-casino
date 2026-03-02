@@ -503,7 +503,7 @@ async function confirmPayment(transactionId) {
   }
   
   try {
-    const res = await fetch('/api/admin/confirm-payment', {
+    const res = await fetch('/api/confirm-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 

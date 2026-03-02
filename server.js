@@ -66,7 +66,7 @@ app.get('/api/room/status/:code', async (req, res) => {
   }
 })
 
-// ✅ Rota para verificar se sala existe (usada pelo loadGameState)
+// ✅ Rota para verificar se sala existe
 app.get('/api/room/:code', async (req, res) => {
   const room = rooms[req.params.code]
   if (!room) return res.json({ exists: false })
@@ -137,7 +137,7 @@ app.post('/api/confirm-payment', async (req, res) => {
   }
 })
 
-// ✅ ROTA DO ADMIN PANEL (IMPORTANTE!)
+// ✅ ROTA DO ADMIN PANEL
 app.get('/admin', (req, res) => {
   res.sendFile(__dirname + '/public/admin.html')
 })
@@ -184,6 +184,7 @@ io.on('connection', (socket) => {
     )
     users[socket.id] = { username }
     socket.emit('registered', { id: socket.id, username })
+    console.log('✅ Usuário registrado:', socket.id, username)
   })
 
   socket.on('createRoom', async () => {
@@ -200,7 +201,7 @@ io.on('connection', (socket) => {
       hands: {},
       turn: socket.id
     }
-    console.log('🏠 Sala criada:', room.code)
+    console.log('🏠 Sala criada:', room.code, 'Host:', socket.id)
     
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
@@ -226,10 +227,27 @@ io.on('connection', (socket) => {
     if (room.host_id === socket.id) return socket.emit('error', { message: 'Você já é o host!' })
 
     await gameService.joinRoom(code, socket.id)
-    rooms[code].guest = socket.id
-    rooms[code].guest_id = socket.id
     
-    console.log('👤 Guest entrou:', code)
+    // ✅ GARANTIR QUE A SALA EXISTE EM MEMÓRIA
+    if (!rooms[code]) {
+      rooms[code] = { 
+        code: code, 
+        host: room.host_id, 
+        guest: socket.id,
+        hostPaid: room.host_paid, 
+        guestPaid: room.guest_paid, 
+        started: room.started,
+        board: [],
+        deck: [],
+        hands: {},
+        turn: room.host_id
+      }
+    } else {
+      rooms[code].guest = socket.id
+      rooms[code].guest_id = socket.id
+    }
+    
+    console.log('👤 Guest entrou:', code, 'Socket:', socket.id, 'Rooms:', rooms[code])
 
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
@@ -251,6 +269,8 @@ io.on('connection', (socket) => {
 
   socket.on('startGame', async (code) => {
     const room = rooms[code]
+    console.log('🎮 startGame recebido - code:', code, 'socket.id:', socket.id, 'room:', room)
+    
     if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
     if (room.host !== socket.id) return socket.emit('error', { message: 'Apenas host pode iniciar' })
     if (!room.guest) return socket.emit('error', { message: 'Aguarde o convidado' })
@@ -277,20 +297,27 @@ io.on('connection', (socket) => {
     rooms[code].turn = room.host
 
     console.log('🎮 Jogo iniciado:', code)
+    console.log('🎮 Host:', room.host, 'Guest:', room.guest)
+    console.log('🎮 Mão Host:', rooms[code].hands[room.host])
+    console.log('🎮 Mão Guest:', rooms[code].hands[room.guest])
 
+    // ✅ ENVIAR gameStart PARA O HOST
     io.to(room.host).emit('gameStart', {
       hand: rooms[code].hands[room.host],
       isHost: true,
       deckCount: rooms[code].deck.length,
       opponent: users[room.guest]?.username || 'Oponente'
     })
+    console.log('📩 gameStart enviado para host:', room.host)
 
+    // ✅ ENVIAR gameStart PARA O GUEST
     io.to(room.guest).emit('gameStart', {
       hand: rooms[code].hands[room.guest],
       isHost: false,
       deckCount: rooms[code].deck.length,
       opponent: users[room.host]?.username || 'Oponente'
     })
+    console.log('📩 gameStart enviado para guest:', room.guest)
 
     io.emit('update', {
       board: [],

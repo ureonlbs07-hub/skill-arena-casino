@@ -202,12 +202,10 @@ socket.on('roomCreated', (data) => {
   document.getElementById('startBtn').classList.add('hidden')
 })
 
-// ✅ CORRIGIDO: Verificar playerType ANTES de definir isHost!
 socket.on('paymentRequired', (data) => {
   console.log('💰 Pagamento necessário:', data)
   currentTransactionId = null
   
-  // ✅ VERIFICAR playerType!
   if (data.playerType === 'host') {
     isHost = true
     console.log('👑 isHost definido como TRUE (host)')
@@ -298,7 +296,6 @@ socket.on('roomJoined', (data) => {
   document.getElementById('startBtn').classList.add('hidden')
 })
 
-// ✅ bothPaid SÓ libera botão para HOST
 socket.on('bothPaid', (data) => {
   console.log('📩 bothPaid recebido:', data, 'isHost:', isHost, 'myId:', myId, 'room:', room)
   
@@ -320,8 +317,9 @@ function startGame() {
   socket.emit('startGame', room)
 }
 
+// ✅ CORRIGIDO: gameStart agora define myTurn corretamente
 socket.on('gameStart', (data) => {
-  console.log('🎮 gameStart recebido:', data, 'isHost:', isHost)
+  console.log('🎮 gameStart recebido:', data, 'myId:', myId)
   hand = data.hand || []
   deck = data.deckCount || 14
   isHost = data.isHost || false
@@ -335,27 +333,35 @@ socket.on('gameStart', (data) => {
   document.getElementById('myCount').innerText = hand.length
   document.getElementById('deckCount').innerText = deck
   
+  // ✅ HOST sempre começa, então se isHost=true, myTurn=true
   if (isHost) {
-    document.getElementById('turn').innerText = '🎮 Sua vez!'
+    myTurn = true
+    document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
+    console.log('✅ myTurn definido como TRUE (host começa)')
   } else {
+    myTurn = false
     document.getElementById('turn').innerText = '⏳ Aguardando oponente...'
     document.getElementById('turn').classList.remove('active')
+    console.log('⏳ myTurn definido como FALSE (guest aguarda)')
   }
 })
 
 socket.on('update', (data) => {
-  console.log('📡 Update recebido:', data)
+  console.log('📡 Update recebido:', data, 'myId:', myId, 'turn:', data.turn)
   if (data.board) renderBoard(data.board)
   if (data.deckCount !== undefined) { 
     deck = data.deckCount
     document.getElementById('deckCount').innerText = deck 
   }
+  // ✅ VERIFICAR SE É MEU TURNO
   if (data.turn === myId) {
+    console.log('✅ É meu turno!')
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
     myTurn = true
   } else {
+    console.log('⏳ Turno do oponente:', data.turn)
     document.getElementById('turn').innerText = '⏳ Oponente...'
     document.getElementById('turn').classList.remove('active')
     myTurn = false
@@ -363,7 +369,7 @@ socket.on('update', (data) => {
 })
 
 socket.on('tilePlayed', (data) => {
-  console.log('🎴 tilePlayed recebido:', data)
+  console.log('🎴 tilePlayed recebido:', data, 'myId:', myId)
   hand = data.hand || []
   deck = data.deckCount || 14
   renderHand(hand)
@@ -372,10 +378,12 @@ socket.on('tilePlayed', (data) => {
   renderBoard(data.board)
   
   if (data.turn === myId) {
+    console.log('✅ É meu turno!')
     document.getElementById('turn').innerText = '✅ SUA VEZ!'
     document.getElementById('turn').classList.add('active')
     myTurn = true
   } else {
+    console.log('⏳ Turno do oponente')
     document.getElementById('turn').innerText = '⏳ Oponente...'
     document.getElementById('turn').classList.remove('active')
     myTurn = false

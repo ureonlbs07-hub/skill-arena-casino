@@ -29,12 +29,45 @@
     .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; cursor: pointer; flex-shrink: 0; font-size: 9px; background: rgba(255,215,0,0.1); transition: all 0.2s; }
     .drop-zone:hover { background: rgba(255,215,0,0.3); }
     .drop-zone.hidden { display: none; }
-    .domino { width: 32px; height: 55px; background: #f5f5dc; border-radius: 5px; display: flex; flex-direction: column; cursor: grab; border: 2px solid #8b7355; flex-shrink: 0; touch-action: none; }
-    .domino.horizontal { width: 55px; height: 32px; flex-direction: row; }
-    .domino.dragging { opacity: 0.5; transform: scale(1.1); }
-    .domino-face { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 2px; gap: 1px; }
-    .domino-face.top { border-bottom: 1px solid #8b7355; }
-    .domino.horizontal .domino-face.top { border-bottom: none; border-right: 1px solid #8b7355; }
+    
+    /* ✅ PEÇAS DE DOMINÓ */
+    .domino { 
+      width: 32px; 
+      height: 55px; 
+      background: #f5f5dc; 
+      border-radius: 5px; 
+      display: flex; 
+      flex-direction: column; 
+      cursor: grab; 
+      border: 2px solid #8b7355; 
+      flex-shrink: 0; 
+      touch-action: none;
+    }
+    .domino.horizontal { 
+      width: 55px; 
+      height: 32px; 
+      flex-direction: row; 
+    }
+    .domino.dragging { 
+      opacity: 0.5; 
+      transform: scale(1.1); 
+    }
+    .domino-face { 
+      flex: 1; 
+      display: grid; 
+      grid-template-columns: repeat(3, 1fr); 
+      grid-template-rows: repeat(3, 1fr); 
+      padding: 2px; 
+      gap: 1px; 
+    }
+    .domino-face.top { 
+      border-bottom: 1px solid #8b7355; 
+    }
+    .domino.horizontal .domino-face.top { 
+      border-bottom: none; 
+      border-right: 1px solid #8b7355; 
+    }
+    
     .pip { background: #000; border-radius: 50%; width: 4px; height: 4px; justify-self: center; align-self: center; display: none; }
     .v0 .pip { display: none; }
     .v1 .p5 { display: block; }
@@ -134,9 +167,6 @@ let touchStartX = 0, touchStartY = 0
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
-// ============================================
-// ✅ NAVEGAÇÃO ENTRE TELAS
-// ============================================
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
   document.getElementById(id).classList.add('active')
@@ -159,9 +189,6 @@ function startHostPaymentCheck() {
   }, 2000)
 }
 
-// ============================================
-// ✅ REGISTRO E CONEXÃO
-// ============================================
 function register() {
   const u = document.getElementById('username').value
   if (!u) return alert('Nome!')
@@ -180,12 +207,8 @@ socket.on('connect', () => {
 
 socket.on('disconnect', () => {
   console.log('❌ Socket desconectado')
-  // ✅ SEM SALVAR ESTADO - jogador perde a sala
 })
 
-// ============================================
-// ✅ SALAS
-// ============================================
 function createRoom() { socket.emit('createRoom') }
 
 socket.on('roomCreated', (data) => {
@@ -222,9 +245,6 @@ socket.on('bothPaid', (data) => {
   }
 })
 
-// ============================================
-// ✅ PAGAMENTO PIX
-// ============================================
 socket.on('paymentRequired', (data) => {
   currentTransactionId = null
   isHost = (data.playerType === 'host')
@@ -285,9 +305,6 @@ function cancelPayment() {
   showScreen('menu-screen')
 }
 
-// ============================================
-// ✅ JOGO
-// ============================================
 function startGame() {
   if (!room) return alert('Erro!')
   if (!isHost) return alert('Apenas host!')
@@ -376,9 +393,6 @@ socket.on('gameOver', () => {
   location.reload() 
 })
 
-// ============================================
-// ✅ DRAG AND DROP (DESKTOP)
-// ============================================
 function allowDrop(e) { e.preventDefault() }
 
 function drop(e, side) { 
@@ -403,9 +417,6 @@ function handleDrag(e) {
   if (draggedElement) draggedElement.classList.add('dragging')
 }
 
-// ============================================
-// ✅ TOUCH EVENTS (MOBILE)
-// ============================================
 function handleTouchStart(e) {
   if (!myTurn) return
   e.preventDefault()
@@ -469,9 +480,6 @@ function isOverElement(x, y, element) {
 function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
-// ============================================
-// ✅ RENDERIZAÇÃO
-// ============================================
 function renderHand(h) {
   if (!h || !Array.isArray(h) || h.length === 0) { 
     document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'

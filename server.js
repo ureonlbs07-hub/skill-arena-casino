@@ -411,22 +411,21 @@ io.on('connection', (socket) => {
     io.emit('update', { board: room.board, turn: room.turn, deckCount: room.deck.length })
   })
 
-  socket.on('paymentConfirmed', async (data) => {
-    console.log('💰 Pagamento confirmado pelo jogador:', data)
-  })
-
-  socket.on('disconnect', async () => {
-    console.log('❌ Disconnect:', socket.id)
-    for (const code in rooms) {
-      if (rooms[code].host === socket.id || rooms[code].guest === socket.id) {
-        await db.query(`UPDATE rooms SET ended = TRUE WHERE code = $1`, [code])
-        delete rooms[code]
-      }
-    }
-    sendRoomList()
-  })
+ socket.on('disconnect', async () => {
+  console.log('disconnect', socket.id)
 })
 
+ socket.on('guestLeft', (data) => {
+  alert(data.message)
+  showScreen('wait-screen')
+  document.getElementById('waitMessage').innerText =
+    '👑 Aguardando novo jogador...\n\n⚠️ Se sair perderá o valor pago.'
+})
+
+socket.on('matchCancelled', (data) => {
+  alert(data.message)
+  location.reload()
+})
 function sendRoomList() {
   const list = Object.values(rooms).map(r => ({
     code: r.code,
@@ -449,4 +448,79 @@ initDatabase().then(() => {
     console.log('📊 PostgreSQL: Conectado')
     console.log('============================================')
   })
+  // ============================
+// DISCONNECT CONTROLADO
+// ============================
+socket.on('disconnect', async () => {
+  console.log('❌ Disconnect:', socket.id)
+
+  for (const code in rooms) {
+    const room = rooms[code]
+
+    if (!room) continue
+
+    // ============================
+    // HOST SAIU
+    // ============================
+    if (room.host === socket.id) {
+
+      console.log('👑 Host saiu da sala:', code)
+
+      try {
+        await db.query(
+          `UPDATE rooms SET started = FALSE WHERE code = $1`,
+          [code]
+        )
+      } catch (err) {
+        console.log('Erro DB ao encerrar sala:', err.message)
+      }
+
+      if (room.guest) {
+        io.to(room.guest).emit('matchCancelled', {
+          message: 'O host saiu. A sala foi encerrada.'
+        })
+      }
+
+      delete rooms[code]
+      sendRoomList()
+      break
+    }
+
+    // ============================
+    // GUEST SAIU
+    // ============================
+    if (room.guest === socket.id) {
+
+      console.log('🎲 Guest saiu da sala:', code)
+
+      room.guest = null
+      room.guestPaid = false
+      room.started = false
+      room.board = []
+      room.deck = []
+      room.hands = {}
+      room.turn = room.host
+
+      try {
+        await db.query(
+          `UPDATE rooms 
+           SET guest_id = NULL,
+               guest_paid = FALSE,
+               started = FALSE
+           WHERE code = $1`,
+          [code]
+        )
+      } catch (err) {
+        console.log('Erro DB ao resetar sala:', err.message)
+      }
+
+      io.to(room.host).emit('guestLeft', {
+        message: 'Oponente saiu. Aguardando novo jogador.'
+      })
+
+      sendRoomList()
+      break
+    }
+  }
+})
 })

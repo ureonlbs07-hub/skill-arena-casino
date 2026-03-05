@@ -138,9 +138,18 @@
       align-items: center;
       padding: 8px 0;
     }
-    .payment-info { flex: 1; }
-    .payment-actions { display: flex; gap: 8px; }
-    .payment-actions button { width: auto; padding: 6px 12px; font-size: 12px; }
+    .payment-info {
+      flex: 1;
+    }
+    .payment-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .payment-actions button {
+      width: auto;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
     .player-type {
       font-size: 11px;
       padding: 2px 6px;
@@ -486,7 +495,6 @@ async function loadPendingPayments() {
   }
 }
 
-// ✅ FUNÇÃO ATUALIZADA - ENVIA PASSWORD EM VEZ DE TOKEN
 async function confirmPayment(transactionId) {
   console.log('💰 confirmPayment CHAMADO:', transactionId)
   
@@ -495,12 +503,12 @@ async function confirmPayment(transactionId) {
   }
   
   try {
-    const res = await fetch('/api/confirm-payment', {
+    const res = await fetch('/api/admin/confirm-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         transactionId,
-        password: 'admin123'
+        token: adminToken 
       })
     })
     
@@ -519,6 +527,7 @@ async function confirmPayment(transactionId) {
     showMessage('dashboardMessage', 'Erro de conexão: ' + error.message, 'error')
   }
 }
+
 
 async function cancelPayment(transactionId) {
   console.log('❌ cancelPayment CHAMADO:', transactionId)

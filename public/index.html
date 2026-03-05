@@ -25,7 +25,6 @@
     #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
     #turn.active { background: #28a745; }
     
-    /* ✅ MESA COM SCROLL HORIZONTAL */
     .board-container { 
       background: #1a472a; 
       border: 4px solid #3d2817; 
@@ -33,8 +32,6 @@
       padding: 15px; 
       margin: 8px 0; 
       overflow-x: auto; 
-      position: relative;
-      min-height: 100px;
     }
     .board { 
       display: flex; 
@@ -59,25 +56,23 @@
     }
     .drop-zone.hidden { display: none; }
     
-    /* ✅ DOMINÓ NA MÃO - VERTICAL (EM PÉ) */
+    /* ✅ DOMINÓ - MESMA CLASSE, DIFERENTE ORIENTAÇÃO */
     .domino { 
-      width: 30px !important; 
-      height: 60px !important; 
+      width: 30px; 
+      height: 60px; 
       background: #f5f5dc; 
       border-radius: 5px; 
-      display: flex !important; 
-      flex-direction: column !important; 
+      display: flex; 
+      flex-direction: column; 
       border: 2px solid #8b7355; 
       flex-shrink: 0;
       cursor: grab;
     }
-    .domino.dragging { opacity: 0.5; transform: scale(1.1); }
-    
-    /* ✅ DOMINÓ NA MESA - HORIZONTAL (DEITADO) */
+    .domino.dragging { opacity: 0.5; }
     .domino.mesa { 
-      width: 60px !important; 
-      height: 30px !important; 
-      flex-direction: row !important; 
+      width: 60px; 
+      height: 30px; 
+      flex-direction: row; 
     }
     
     .domino-face { 
@@ -89,9 +84,8 @@
       gap: 1px; 
     }
     .domino .domino-face.top { border-bottom: 2px solid #8b7355; }
-    .domino.mesa .domino-face.top { border-bottom: none !important; border-right: 2px solid #8b7355 !important; }
+    .domino.mesa .domino-face.top { border-bottom: none; border-right: 2px solid #8b7355; }
     
-    /* ✅ PONTINHOS */
     .pip { background: #000; border-radius: 50%; width: 4px; height: 4px; justify-self: center; align-self: center; display: none; }
     .v0 .pip { display: none; }
     .v1 .p5 { display: block; }
@@ -163,7 +157,7 @@
     <button class="btn-blue" onclick="buyTile()">🛒 Comprar</button>
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
-  <div class="board-container" id="boardContainer">
+  <div class="board-container">
     <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;">📌 Mesa</h3>
     <div class="board">
       <div class="drop-zone hidden" id="dropLeft">⬅️</div>
@@ -183,7 +177,7 @@
 const socket = io()
 let room = null, myId = null, myTurn = false, isHost = false, hand = [], deck = 14
 let currentTransactionId = null, paymentCheckInterval = null, paymentData = null, hostCheckInterval = null
-let draggedTile = null, draggedElement = null
+let draggedTile = null
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
 
@@ -216,8 +210,6 @@ function register() {
 }
 
 socket.on('registered', (data) => { myId = data.id; showScreen('menu-screen') })
-socket.on('connect', () => console.log('🔌 Conectado'))
-socket.on('disconnect', () => console.log('❌ Desconectado'))
 
 function createRoom() { socket.emit('createRoom') }
 
@@ -383,24 +375,20 @@ function handleDragStart(e) {
   const domino = e.target.closest('.domino')
   if (!domino) return
   draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
-  draggedElement = domino
-  draggedElement.classList.add('dragging')
+  domino.classList.add('dragging')
 }
 
 function handleDragEnd(e) {
-  if (draggedElement) {
-    draggedElement.classList.remove('dragging')
-    draggedElement = null
-  }
+  const domino = e.target.closest('.domino')
+  if (domino) domino.classList.remove('dragging')
+  draggedTile = null
 }
 
 function handleDrop(e, side) {
   e.preventDefault()
   if (!draggedTile) return
   socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
-  if (draggedElement) draggedElement.classList.remove('dragging')
   draggedTile = null
-  draggedElement = null
 }
 
 function allowDrop(e) { e.preventDefault() }
@@ -412,22 +400,11 @@ function handleTouchStart(e) {
   const domino = e.target.closest('.domino')
   if (!domino) return
   draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
-  draggedElement = domino
-  draggedElement.classList.add('dragging')
-  draggedElement.style.position = 'fixed'
-  draggedElement.style.zIndex = '1000'
-}
-
-function handleTouchMove(e) {
-  if (!draggedElement) return
-  e.preventDefault()
-  const touch = e.touches[0]
-  draggedElement.style.left = (touch.clientX - 15) + 'px'
-  draggedElement.style.top = (touch.clientY - 30) + 'px'
+  domino.style.opacity = '0.5'
 }
 
 function handleTouchEnd(e) {
-  if (!draggedElement) return
+  if (!draggedTile) return
   e.preventDefault()
   const touch = e.changedTouches[0]
   let side = null
@@ -446,12 +423,7 @@ function handleTouchEnd(e) {
     socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
   }
   
-  draggedElement.classList.remove('dragging')
-  draggedElement.style.position = ''
-  draggedElement.style.left = ''
-  draggedElement.style.top = ''
-  draggedElement.style.zIndex = ''
-  draggedElement = null
+  document.querySelectorAll('.domino').forEach(d => d.style.opacity = '1')
   draggedTile = null
 }
 
@@ -464,42 +436,33 @@ function isOverElement(x, y, element) {
 function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
-// ✅ RENDERIZA MÃO (VERTICAL)
 function renderHand(h) {
   if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
   document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false)).join('')
 }
 
-// ✅ RENDERIZA MESA (HORIZONTAL - DEITADO)
 function renderBoard(b) {
-  if (!b || !Array.isArray(b)) return
+  if (!b || !Array.isArray(b)) { document.getElementById('boardTiles').innerHTML = ''; return }
   document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
 }
 
-// ✅ CRIA DOMINÓ
 function createDomino(v1, v2, horizontal) {
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
   
   if (horizontal) {
-    // ✅ MESA - HORIZONTAL
-    return '<div class="domino mesa" ' +
-      'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
+    return '<div class="domino mesa" data-v1="' + v1 + '" data-v2="' + v2 + '">' +
       '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
-      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div>' +
-    '</div>'
+      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div></div>'
   } else {
-    // ✅ MÃO - VERTICAL COM DRAG
     return '<div class="domino" ' +
       'draggable="' + myTurn + '" ' +
       'ondragstart="handleDragStart(event)" ' +
       'ondragend="handleDragEnd(event)" ' +
       'ontouchstart="handleTouchStart(event)" ' +
-      'ontouchmove="handleTouchMove(event)" ' +
       'ontouchend="handleTouchEnd(event)" ' +
       'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
       '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
-      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div>' +
-    '</div>'
+      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div></div>'
   }
 }
 
@@ -542,8 +505,8 @@ function getBoardEnds(board) {
   return { left: parseInt(board[0][0]), right: parseInt(board[board.length - 1][1]) }
 }
 
-// ✅ ADICIONA DROP ZONES NO BOARD
-document.addEventListener('DOMContentLoaded', () => {
+// ✅ SETUP DROP ZONES PARA DESKTOP
+function setupDropZones() {
   const dropLeft = document.getElementById('dropLeft')
   const dropRight = document.getElementById('dropRight')
   const dropCenter = document.getElementById('dropCenter')
@@ -560,7 +523,9 @@ document.addEventListener('DOMContentLoaded', () => {
     dropCenter.addEventListener('dragover', allowDrop)
     dropCenter.addEventListener('drop', (e) => handleDrop(e, 'center'))
   }
-})
+}
+
+document.addEventListener('DOMContentLoaded', setupDropZones)
 </script>
 </body>
 </html>

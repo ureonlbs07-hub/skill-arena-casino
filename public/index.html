@@ -25,44 +25,28 @@
     #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
     #turn.active { background: #28a745; }
     
-    /* ✅ MESA COM SCROLL */
+    /* ✅ MESA COM SCROLL HORIZONTAL */
     .board-container { 
       background: #1a472a; 
       border: 4px solid #3d2817; 
       border-radius: 10px; 
-      padding: 8px; 
+      padding: 15px; 
       margin: 8px 0; 
       overflow-x: auto; 
       position: relative;
+      min-height: 100px;
     }
     .board { 
       display: flex; 
       align-items: center; 
-      gap: 3px; 
-      min-height: 70px; 
+      gap: 5px; 
       padding: 10px;
       min-width: max-content;
     }
     
-    /* ✅ SETAS DE SCROLL */
-    .scroll-indicator {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 24px;
-      color: #ffd700;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.3s;
-      z-index: 10;
-    }
-    .scroll-indicator.left { left: 5px; }
-    .scroll-indicator.right { right: 5px; }
-    .scroll-indicator.visible { opacity: 1; }
-    
     .drop-zone { 
-      width: 32px; 
-      height: 55px; 
+      width: 60px; 
+      height: 32px; 
       border: 2px dashed #ffd700; 
       border-radius: 6px; 
       display: flex; 
@@ -71,37 +55,29 @@
       color: #ffd700; 
       flex-shrink: 0; 
       background: rgba(255,215,0,0.1); 
+      font-size: 10px;
     }
     .drop-zone.hidden { display: none; }
     
-    /* ✅ DOMINÓ NA MÃO (VERTICAL) */
-    .domino-hand { 
-      width: 32px; 
-      height: 60px; 
+    /* ✅ DOMINÓ NA MÃO - VERTICAL (EM PÉ) */
+    .domino { 
+      width: 30px !important; 
+      height: 60px !important; 
       background: #f5f5dc; 
       border-radius: 5px; 
-      display: flex; 
-      flex-direction: column; 
+      display: flex !important; 
+      flex-direction: column !important; 
       border: 2px solid #8b7355; 
       flex-shrink: 0;
       cursor: grab;
-      transition: transform 0.2s, opacity 0.2s;
     }
-    .domino-hand.dragging { 
-      opacity: 0.5; 
-      transform: scale(1.1); 
-    }
+    .domino.dragging { opacity: 0.5; transform: scale(1.1); }
     
-    /* ✅ DOMINÓ NA MESA (HORIZONTAL) */
-    .domino-board { 
-      width: 60px; 
-      height: 32px; 
-      background: #f5f5dc; 
-      border-radius: 5px; 
-      display: flex; 
-      flex-direction: row; 
-      border: 2px solid #8b7355; 
-      flex-shrink: 0;
+    /* ✅ DOMINÓ NA MESA - HORIZONTAL (DEITADO) */
+    .domino.mesa { 
+      width: 60px !important; 
+      height: 30px !important; 
+      flex-direction: row !important; 
     }
     
     .domino-face { 
@@ -112,19 +88,11 @@
       padding: 2px; 
       gap: 1px; 
     }
-    .domino-hand .domino-face.top { border-bottom: 2px solid #8b7355; }
-    .domino-board .domino-face.left { border-right: 2px solid #8b7355; }
+    .domino .domino-face.top { border-bottom: 2px solid #8b7355; }
+    .domino.mesa .domino-face.top { border-bottom: none !important; border-right: 2px solid #8b7355 !important; }
     
-    /* ✅ PONTINHOS DO DOMINÓ */
-    .pip { 
-      background: #000; 
-      border-radius: 50%; 
-      width: 5px; 
-      height: 5px; 
-      justify-self: center; 
-      align-self: center; 
-      display: none; 
-    }
+    /* ✅ PONTINHOS */
+    .pip { background: #000; border-radius: 50%; width: 4px; height: 4px; justify-self: center; align-self: center; display: none; }
     .v0 .pip { display: none; }
     .v1 .p5 { display: block; }
     .v2 .p1, .v2 .p9 { display: block; }
@@ -196,8 +164,6 @@
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
   <div class="board-container" id="boardContainer">
-    <div class="scroll-indicator left" id="scrollLeft">◀</div>
-    <div class="scroll-indicator right" id="scrollRight">▶</div>
     <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;">📌 Mesa</h3>
     <div class="board">
       <div class="drop-zone hidden" id="dropLeft">⬅️</div>
@@ -220,27 +186,6 @@ let currentTransactionId = null, paymentCheckInterval = null, paymentData = null
 let draggedTile = null, draggedElement = null
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
-
-// ✅ ATUALIZAR SETAS DE SCROLL
-function updateScrollIndicators() {
-  const container = document.getElementById('boardContainer')
-  const scrollLeft = document.getElementById('scrollLeft')
-  const scrollRight = document.getElementById('scrollRight')
-  
-  if (!container) return
-  
-  if (container.scrollLeft > 10) {
-    scrollLeft.classList.add('visible')
-  } else {
-    scrollLeft.classList.remove('visible')
-  }
-  
-  if (container.scrollLeft < container.scrollWidth - container.clientWidth - 10) {
-    scrollRight.classList.add('visible')
-  } else {
-    scrollRight.classList.remove('visible')
-  }
-}
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
@@ -383,7 +328,6 @@ socket.on('gameStart', (data) => {
     document.getElementById('turn').innerText = '⏳ Oponente...'
     hideZones()
   }
-  updateScrollIndicators()
 })
 
 socket.on('update', (data) => {
@@ -400,7 +344,6 @@ socket.on('update', (data) => {
     myTurn = false
     hideZones()
   }
-  updateScrollIndicators()
 })
 
 socket.on('tilePlayed', (data) => {
@@ -420,7 +363,6 @@ socket.on('tilePlayed', (data) => {
     myTurn = false
     hideZones()
   }
-  updateScrollIndicators()
 })
 
 socket.on('tileBought', (data) => {
@@ -438,13 +380,11 @@ socket.on('gameOver', () => { alert('🏆 Fim!'); location.reload() })
 // ✅ DRAG DESKTOP
 function handleDragStart(e) {
   if (!myTurn) { e.preventDefault(); return }
-  draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) }
-  draggedElement = e.target.closest('.domino-hand')
-  if (draggedElement) {
-    draggedElement.classList.add('dragging')
-  }
-  e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData('text/plain', JSON.stringify(draggedTile))
+  const domino = e.target.closest('.domino')
+  if (!domino) return
+  draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
+  draggedElement = domino
+  draggedElement.classList.add('dragging')
 }
 
 function handleDragEnd(e) {
@@ -454,25 +394,36 @@ function handleDragEnd(e) {
   }
 }
 
+function handleDrop(e, side) {
+  e.preventDefault()
+  if (!draggedTile) return
+  socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  if (draggedElement) draggedElement.classList.remove('dragging')
+  draggedTile = null
+  draggedElement = null
+}
+
+function allowDrop(e) { e.preventDefault() }
+
 // ✅ TOUCH MOBILE
 function handleTouchStart(e) {
   if (!myTurn) return
   e.preventDefault()
-  const target = e.target.closest('.domino-hand')
-  if (!target) return
-  draggedTile = { v1: parseInt(target.getAttribute('data-v1')), v2: parseInt(target.getAttribute('data-v2')) }
-  draggedElement = target
+  const domino = e.target.closest('.domino')
+  if (!domino) return
+  draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
+  draggedElement = domino
   draggedElement.classList.add('dragging')
+  draggedElement.style.position = 'fixed'
+  draggedElement.style.zIndex = '1000'
 }
 
 function handleTouchMove(e) {
   if (!draggedElement) return
   e.preventDefault()
   const touch = e.touches[0]
-  draggedElement.style.position = 'fixed'
-  draggedElement.style.left = (touch.clientX - 16) + 'px'
+  draggedElement.style.left = (touch.clientX - 15) + 'px'
   draggedElement.style.top = (touch.clientY - 30) + 'px'
-  draggedElement.style.zIndex = '1000'
 }
 
 function handleTouchEnd(e) {
@@ -516,39 +467,40 @@ function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }
 // ✅ RENDERIZA MÃO (VERTICAL)
 function renderHand(h) {
   if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
-  document.getElementById('hand').innerHTML = h.map(t => createDominoHand(t[0], t[1])).join('')
+  document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false)).join('')
 }
 
-// ✅ RENDERIZA MESA (HORIZONTAL)
+// ✅ RENDERIZA MESA (HORIZONTAL - DEITADO)
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
-  document.getElementById('boardTiles').innerHTML = b.map(t => createDominoBoard(t[0], t[1])).join('')
-  setTimeout(updateScrollIndicators, 100)
+  document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
 }
 
-// ✅ DOMINÓ NA MÃO (VERTICAL)
-function createDominoHand(v1, v2) {
+// ✅ CRIA DOMINÓ
+function createDomino(v1, v2, horizontal) {
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
-  return '<div class="domino-hand" ' +
-    'draggable="' + myTurn + '" ' +
-    'ondragstart="handleDragStart(event)" ' +
-    'ondragend="handleDragEnd(event)" ' +
-    'ontouchstart="handleTouchStart(event)" ' +
-    'ontouchmove="handleTouchMove(event)" ' +
-    'ontouchend="handleTouchEnd(event)" ' +
-    'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
-    '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
-    '<div class="domino-face bottom v' + v2 + '">' + pips + '</div>' +
-  '</div>'
-}
-
-// ✅ DOMINÓ NA MESA (HORIZONTAL)
-function createDominoBoard(v1, v2) {
-  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
-  return '<div class="domino-board" data-v1="' + v1 + '" data-v2="' + v2 + '">' +
-    '<div class="domino-face left v' + v1 + '">' + pips + '</div>' +
-    '<div class="domino-face right v' + v2 + '">' + pips + '</div>' +
-  '</div>'
+  
+  if (horizontal) {
+    // ✅ MESA - HORIZONTAL
+    return '<div class="domino mesa" ' +
+      'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
+      '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
+      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div>' +
+    '</div>'
+  } else {
+    // ✅ MÃO - VERTICAL COM DRAG
+    return '<div class="domino" ' +
+      'draggable="' + myTurn + '" ' +
+      'ondragstart="handleDragStart(event)" ' +
+      'ondragend="handleDragEnd(event)" ' +
+      'ontouchstart="handleTouchStart(event)" ' +
+      'ontouchmove="handleTouchMove(event)" ' +
+      'ontouchend="handleTouchEnd(event)" ' +
+      'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
+      '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
+      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div>' +
+    '</div>'
+  }
 }
 
 function hideZones() {
@@ -590,11 +542,23 @@ function getBoardEnds(board) {
   return { left: parseInt(board[0][0]), right: parseInt(board[board.length - 1][1]) }
 }
 
-// ✅ LISTENER PARA SCROLL
+// ✅ ADICIONA DROP ZONES NO BOARD
 document.addEventListener('DOMContentLoaded', () => {
-  const container = document.getElementById('boardContainer')
-  if (container) {
-    container.addEventListener('scroll', updateScrollIndicators)
+  const dropLeft = document.getElementById('dropLeft')
+  const dropRight = document.getElementById('dropRight')
+  const dropCenter = document.getElementById('dropCenter')
+  
+  if (dropLeft) {
+    dropLeft.addEventListener('dragover', allowDrop)
+    dropLeft.addEventListener('drop', (e) => handleDrop(e, 'left'))
+  }
+  if (dropRight) {
+    dropRight.addEventListener('dragover', allowDrop)
+    dropRight.addEventListener('drop', (e) => handleDrop(e, 'right'))
+  }
+  if (dropCenter) {
+    dropCenter.addEventListener('dragover', allowDrop)
+    dropCenter.addEventListener('drop', (e) => handleDrop(e, 'center'))
   }
 })
 </script>

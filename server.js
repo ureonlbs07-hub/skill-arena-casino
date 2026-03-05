@@ -40,7 +40,6 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/game', gameRoutes)
 app.use('/api/admin', adminRoutes)
 
-// ✅ Rota para verificar status da sala
 app.get('/api/room/status/:code', async (req, res) => {
   try {
     const { code } = req.params
@@ -56,14 +55,12 @@ app.get('/api/room/status/:code', async (req, res) => {
   }
 })
 
-// ✅ Rota para verificar se sala existe
 app.get('/api/room/:code', async (req, res) => {
   const room = rooms[req.params.code]
   if (!room) return res.json({ exists: false })
   res.json({ exists: true, players: (room.host ? 1 : 0) + (room.guest ? 1 : 0), started: room.started })
 })
 
-// ✅ Rota admin confirmar pagamento
 app.post('/api/confirm-payment', async (req, res) => {
   try {
     const { transactionId, password } = req.body
@@ -96,7 +93,7 @@ app.post('/api/confirm-payment', async (req, res) => {
   }
 })
 
-// ✅ ROTA DO ADMIN PANEL - GARANTIDA!
+// ✅ ROTA DO ADMIN
 app.get('/admin', (req, res) => {
   const adminPath = path.join(__dirname, 'public', 'admin.html')
   console.log('📁 Admin path:', adminPath)
@@ -140,6 +137,7 @@ io.on('connection', (socket) => {
     await db.query(`INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = $2`, [socket.id, username])
     users[socket.id] = { username }
     socket.emit('registered', { id: socket.id, username })
+    console.log('✅ Registrado:', socket.id, username)
   })
 
   socket.on('reconnect', (data) => {
@@ -204,7 +202,7 @@ io.on('connection', (socket) => {
     socketToRoom[socket.id] = code
     socket.join(code)
     
-    console.log('👤 Guest entrou:', code)
+    console.log('👤 Guest entrou:', code, 'Socket:', socket.id)
 
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
@@ -221,6 +219,8 @@ io.on('connection', (socket) => {
 
   socket.on('startGame', async (code) => {
     const room = rooms[code]
+    console.log('🎮 startGame:', code, 'socket:', socket.id, 'room.host:', room?.host)
+    
     if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
     if (room.host !== socket.id) return socket.emit('error', { message: 'Apenas host pode iniciar' })
     if (!room.guest) return socket.emit('error', { message: 'Aguarde o convidado' })
@@ -314,8 +314,16 @@ io.on('connection', (socket) => {
   })
 })
 
+// ✅ CORRIGIDO: Usa "r.guest" em vez de "room.guest"
 function sendRoomList() {
-  const list = Object.values(rooms).map(r => ({ code: r.code, players: (r.host ? 1 : 0) + (room.guest ? 1 : 0), started: r.started, hostPaid: r.hostPaid || false, guestPaid: r.guestPaid || false }))
+  const list = Object.values(rooms).map(r => ({ 
+    code: r.code, 
+    players: (r.host ? 1 : 0) + (r.guest ? 1 : 0), 
+    started: r.started, 
+    hostPaid: r.hostPaid || false, 
+    guestPaid: r.guestPaid || false 
+  }))
+  console.log('📋 Lista de salas:', list)
   io.emit('roomList', list)
 }
 

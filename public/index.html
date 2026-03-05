@@ -2,11 +2,11 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Dominó - Skill Arena</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; }
+    body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; touch-action: manipulation; }
     .screen { display: none; }
     .screen.active { display: block; }
     .card { background: rgba(0,0,0,0.8); border-radius: 15px; padding: 15px; max-width: 400px; margin: 20px auto; }
@@ -25,38 +25,55 @@
     #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
     #turn.active { background: #28a745; }
     .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 8px; margin: 8px 0; overflow-x: auto; }
-    .board { display: flex; align-items: center; gap: 3px; min-height: 70px; flex-wrap: wrap; }
+    .board { display: flex; align-items: center; gap: 3px; min-height: 70px; }
     .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; flex-shrink: 0; background: rgba(255,215,0,0.1); }
     .drop-zone.hidden { display: none; }
     
-    /* PEÇAS DE DOMINÓ */
+    /* ✅ DOMINÓ COM PONTINHOS (PIPS) */
     .domino { 
-      width: 30px; 
+      width: 32px; 
       height: 60px; 
-      background: #fff; 
-      border-radius: 4px; 
+      background: #f5f5dc; 
+      border-radius: 5px; 
       display: flex; 
       flex-direction: column; 
-      border: 2px solid #333; 
+      border: 2px solid #8b7355; 
       flex-shrink: 0;
-      cursor: pointer;
+      cursor: grab;
     }
     .domino.horizontal { 
       width: 60px; 
-      height: 30px; 
+      height: 32px; 
       flex-direction: row; 
     }
     .domino-face { 
       flex: 1; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      font-size: 14px;
-      color: #000;
-      font-weight: bold;
+      display: grid; 
+      grid-template-columns: repeat(3, 1fr); 
+      grid-template-rows: repeat(3, 1fr); 
+      padding: 2px; 
+      gap: 1px; 
     }
-    .domino-face.top { border-bottom: 2px solid #333; }
-    .domino.horizontal .domino-face.top { border-bottom: none; border-right: 2px solid #333; }
+    .domino-face.top { border-bottom: 2px solid #8b7355; }
+    .domino.horizontal .domino-face.top { border-bottom: none; border-right: 2px solid #8b7355; }
+    
+    /* ✅ PONTINHOS DO DOMINÓ */
+    .pip { 
+      background: #000; 
+      border-radius: 50%; 
+      width: 5px; 
+      height: 5px; 
+      justify-self: center; 
+      align-self: center; 
+      display: none; 
+    }
+    .v0 .pip { display: none; }
+    .v1 .p5 { display: block; }
+    .v2 .p1, .v2 .p9 { display: block; }
+    .v3 .p1, .v3 .p5, .v3 .p9 { display: block; }
+    .v4 .p1, .v4 .p3, .v4 .p7, .v4 .p9 { display: block; }
+    .v5 .p1, .v5 .p3, .v5 .p5, .v5 .p7, .v5 .p9 { display: block; }
+    .v6 .p1, .v6 .p3, .v6 .p4, .v6 .p6, .v6 .p7, .v6 .p9 { display: block; }
     
     .hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; min-height: 70px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 8px; }
     #action-buttons { display: flex; gap: 8px; justify-content: center; margin: 8px 0; }
@@ -334,13 +351,21 @@ socket.on('tileBought', (data) => {
 socket.on('error', (data) => alert('Erro: ' + data.message))
 socket.on('gameOver', () => { alert('🏆 Fim!'); location.reload() })
 
+// ✅ DRAG DESKTOP
+function handleDragStart(e) {
+  if (!myTurn) { e.preventDefault(); return }
+  draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) }
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+// ✅ TOUCH MOBILE
 function handleTouchStart(e) {
   if (!myTurn) return
   e.preventDefault()
-  const touch = e.touches[0]
   const target = e.target.closest('.domino')
   if (!target) return
   draggedTile = { v1: parseInt(target.getAttribute('data-v1')), v2: parseInt(target.getAttribute('data-v2')) }
+  target.style.opacity = '0.5'
 }
 
 function handleTouchEnd(e) {
@@ -348,14 +373,23 @@ function handleTouchEnd(e) {
   e.preventDefault()
   const touch = e.changedTouches[0]
   let side = null
+  
   const dropLeft = document.getElementById('dropLeft')
   const dropRight = document.getElementById('dropRight')
   const dropCenter = document.getElementById('dropCenter')
+  const boardTiles = document.getElementById('boardTiles')
+  
   if (isOverElement(touch.clientX, touch.clientY, dropLeft)) side = 'left'
   else if (isOverElement(touch.clientX, touch.clientY, dropRight)) side = 'right'
   else if (isOverElement(touch.clientX, touch.clientY, dropCenter)) side = 'center'
-  else if (isOverElement(touch.clientX, touch.clientY, document.getElementById('boardTiles'))) side = 'right'
-  if (side) socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  else if (isOverElement(touch.clientX, touch.clientY, boardTiles)) side = 'right'
+  
+  if (side) {
+    socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  }
+  
+  // Reset opacity
+  document.querySelectorAll('.domino').forEach(d => d.style.opacity = '1')
   draggedTile = null
 }
 
@@ -368,18 +402,30 @@ function isOverElement(x, y, element) {
 function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
+// ✅ RENDERIZA MÃO COM PONTINHOS
 function renderHand(h) {
   if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
   document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false)).join('')
 }
 
+// ✅ RENDERIZA MESA COM PONTINHOS
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
   document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
 }
 
+// ✅ CRIA DOMINÓ COM PONTINHOS (PIPS)
 function createDomino(v1, v2, horizontal) {
-  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ontouchstart="handleTouchStart(event)" ontouchend="handleTouchEnd(event)" data-v1="' + v1 + '" data-v2="' + v2 + '"><div class="domino-face top">' + v1 + '</div><div class="domino-face bottom">' + v2 + '</div></div>'
+  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
+  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ' +
+    'draggable="' + (!horizontal && myTurn) + '" ' +
+    'ondragstart="handleDragStart(event)" ' +
+    'ontouchstart="handleTouchStart(event)" ' +
+    'ontouchend="handleTouchEnd(event)" ' +
+    'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
+    '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
+    '<div class="domino-face bottom v' + v2 + '">' + pips + '</div>' +
+  '</div>'
 }
 
 function hideZones() {

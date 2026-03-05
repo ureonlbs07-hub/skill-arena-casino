@@ -25,66 +25,48 @@
     #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
     #turn.active { background: #28a745; }
     
-    .board-container { 
-      background: #1a472a; 
-      border: 4px solid #3d2817; 
-      border-radius: 10px; 
-      padding: 15px; 
-      margin: 8px 0; 
-      overflow-x: auto; 
-    }
-    .board { 
-      display: flex; 
-      align-items: center; 
-      gap: 5px; 
-      padding: 10px;
-      min-width: max-content;
-    }
+    .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 15px; margin: 8px 0; overflow-x: auto; }
+    .board { display: flex; align-items: center; gap: 5px; padding: 10px; min-width: max-content; }
     
-    .drop-zone { 
-      width: 60px; 
-      height: 32px; 
-      border: 2px dashed #ffd700; 
-      border-radius: 6px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      color: #ffd700; 
-      flex-shrink: 0; 
-      background: rgba(255,215,0,0.1); 
-      font-size: 10px;
-    }
+    .drop-zone { width: 60px; height: 32px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; flex-shrink: 0; background: rgba(255,215,0,0.1); }
     .drop-zone.hidden { display: none; }
     
-    /* ✅ DOMINÓ - MESMA CLASSE, DIFERENTE ORIENTAÇÃO */
-    .domino { 
-      width: 30px; 
-      height: 60px; 
-      background: #f5f5dc; 
-      border-radius: 5px; 
-      display: flex; 
-      flex-direction: column; 
-      border: 2px solid #8b7355; 
-      flex-shrink: 0;
-      cursor: grab;
+    /* ✅ DOMINÓ NA MÃO - VERTICAL */
+    .domino-mao { 
+      width: 30px !important; 
+      height: 60px !important; 
+      background: #f5f5dc !important; 
+      border-radius: 5px !important; 
+      display: flex !important; 
+      flex-direction: column !important; 
+      border: 2px solid #8b7355 !important; 
+      flex-shrink: 0 !important;
+      cursor: grab !important;
     }
-    .domino.dragging { opacity: 0.5; }
-    .domino.mesa { 
-      width: 60px; 
-      height: 30px; 
-      flex-direction: row; 
+    .domino-mao.dragging { opacity: 0.5 !important; }
+    
+    /* ✅ DOMINÓ NA MESA - HORIZONTAL */
+    .domino-mesa { 
+      width: 60px !important; 
+      height: 30px !important; 
+      background: #f5f5dc !important; 
+      border-radius: 5px !important; 
+      display: flex !important; 
+      flex-direction: row !important; 
+      border: 2px solid #8b7355 !important; 
+      flex-shrink: 0 !important;
     }
     
     .domino-face { 
-      flex: 1; 
-      display: grid; 
-      grid-template-columns: repeat(3, 1fr); 
-      grid-template-rows: repeat(3, 1fr); 
-      padding: 2px; 
-      gap: 1px; 
+      flex: 1 !important;
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr) !important;
+      grid-template-rows: repeat(3, 1fr) !important;
+      padding: 2px !important;
+      gap: 1px !important;
     }
-    .domino .domino-face.top { border-bottom: 2px solid #8b7355; }
-    .domino.mesa .domino-face.top { border-bottom: none; border-right: 2px solid #8b7355; }
+    .domino-mao .domino-face.superior { border-bottom: 2px solid #8b7355 !important; }
+    .domino-mesa .domino-face.esquerda { border-right: 2px solid #8b7355 !important; }
     
     .pip { background: #000; border-radius: 50%; width: 4px; height: 4px; justify-self: center; align-self: center; display: none; }
     .v0 .pip { display: none; }
@@ -210,7 +192,6 @@ function register() {
 }
 
 socket.on('registered', (data) => { myId = data.id; showScreen('menu-screen') })
-
 function createRoom() { socket.emit('createRoom') }
 
 socket.on('roomCreated', (data) => {
@@ -369,17 +350,17 @@ socket.on('tileBought', (data) => {
 socket.on('error', (data) => alert('Erro: ' + data.message))
 socket.on('gameOver', () => { alert('🏆 Fim!'); location.reload() })
 
-// ✅ DRAG DESKTOP
+// ✅ DRAG & DROP DESKTOP
 function handleDragStart(e) {
   if (!myTurn) { e.preventDefault(); return }
-  const domino = e.target.closest('.domino')
+  const domino = e.target.closest('.domino-mao')
   if (!domino) return
   draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
   domino.classList.add('dragging')
 }
 
 function handleDragEnd(e) {
-  const domino = e.target.closest('.domino')
+  const domino = e.target.closest('.domino-mao')
   if (domino) domino.classList.remove('dragging')
   draggedTile = null
 }
@@ -397,7 +378,7 @@ function allowDrop(e) { e.preventDefault() }
 function handleTouchStart(e) {
   if (!myTurn) return
   e.preventDefault()
-  const domino = e.target.closest('.domino')
+  const domino = e.target.closest('.domino-mao')
   if (!domino) return
   draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
   domino.style.opacity = '0.5'
@@ -419,11 +400,9 @@ function handleTouchEnd(e) {
   else if (isOverElement(touch.clientX, touch.clientY, dropCenter)) side = 'center'
   else if (isOverElement(touch.clientX, touch.clientY, boardTiles)) side = 'right'
   
-  if (side) {
-    socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
-  }
+  if (side) socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
   
-  document.querySelectorAll('.domino').forEach(d => d.style.opacity = '1')
+  document.querySelectorAll('.domino-mao').forEach(d => d.style.opacity = '1')
   draggedTile = null
 }
 
@@ -436,34 +415,31 @@ function isOverElement(x, y, element) {
 function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
+// ✅ RENDERIZAÇÃO
 function renderHand(h) {
-  if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
-  document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false)).join('')
+  if (!h || !Array.isArray(h) || h.length === 0) { 
+    document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'
+    return 
+  }
+  document.getElementById('hand').innerHTML = h.map(t => createDominoMao(t[0], t[1])).join('')
 }
 
 function renderBoard(b) {
-  if (!b || !Array.isArray(b)) { document.getElementById('boardTiles').innerHTML = ''; return }
-  document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
+  if (!b || !Array.isArray(b) || b.length === 0) { 
+    document.getElementById('boardTiles').innerHTML = ''
+    return 
+  }
+  document.getElementById('boardTiles').innerHTML = b.map(t => createDominoMesa(t[0], t[1])).join('')
 }
 
-function createDomino(v1, v2, horizontal) {
+function createDominoMao(v1, v2) {
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
-  
-  if (horizontal) {
-    return '<div class="domino mesa" data-v1="' + v1 + '" data-v2="' + v2 + '">' +
-      '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
-      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div></div>'
-  } else {
-    return '<div class="domino" ' +
-      'draggable="' + myTurn + '" ' +
-      'ondragstart="handleDragStart(event)" ' +
-      'ondragend="handleDragEnd(event)" ' +
-      'ontouchstart="handleTouchStart(event)" ' +
-      'ontouchend="handleTouchEnd(event)" ' +
-      'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
-      '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
-      '<div class="domino-face bottom v' + v2 + '">' + pips + '</div></div>'
-  }
+  return '<div class="domino-mao" draggable="' + myTurn + '" ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)" ontouchstart="handleTouchStart(event)" ontouchend="handleTouchEnd(event)" data-v1="' + v1 + '" data-v2="' + v2 + '"><div class="domino-face superior v' + v1 + '">' + pips + '</div><div class="domino-face inferior v' + v2 + '">' + pips + '</div></div>'
+}
+
+function createDominoMesa(v1, v2) {
+  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
+  return '<div class="domino-mesa" data-v1="' + v1 + '" data-v2="' + v2 + '"><div class="domino-face esquerda v' + v1 + '">' + pips + '</div><div class="domino-face direita v' + v2 + '">' + pips + '</div></div>'
 }
 
 function hideZones() {
@@ -505,24 +481,15 @@ function getBoardEnds(board) {
   return { left: parseInt(board[0][0]), right: parseInt(board[board.length - 1][1]) }
 }
 
-// ✅ SETUP DROP ZONES PARA DESKTOP
+// ✅ SETUP DROP ZONES
 function setupDropZones() {
   const dropLeft = document.getElementById('dropLeft')
   const dropRight = document.getElementById('dropRight')
   const dropCenter = document.getElementById('dropCenter')
   
-  if (dropLeft) {
-    dropLeft.addEventListener('dragover', allowDrop)
-    dropLeft.addEventListener('drop', (e) => handleDrop(e, 'left'))
-  }
-  if (dropRight) {
-    dropRight.addEventListener('dragover', allowDrop)
-    dropRight.addEventListener('drop', (e) => handleDrop(e, 'right'))
-  }
-  if (dropCenter) {
-    dropCenter.addEventListener('dragover', allowDrop)
-    dropCenter.addEventListener('drop', (e) => handleDrop(e, 'center'))
-  }
+  if (dropLeft) { dropLeft.addEventListener('dragover', allowDrop); dropLeft.addEventListener('drop', (e) => handleDrop(e, 'left')) }
+  if (dropRight) { dropRight.addEventListener('dragover', allowDrop); dropRight.addEventListener('drop', (e) => handleDrop(e, 'right')) }
+  if (dropCenter) { dropCenter.addEventListener('dragover', allowDrop); dropCenter.addEventListener('drop', (e) => handleDrop(e, 'center')) }
 }
 
 document.addEventListener('DOMContentLoaded', setupDropZones)

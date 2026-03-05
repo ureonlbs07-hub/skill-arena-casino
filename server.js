@@ -28,40 +28,27 @@ const io = new Server(server, {
 
 let rooms = {}
 let users = {}
-let adminSessions = {}
 
 // ✅ ROTAS DA API
 app.use('/api/payment', paymentRoutes)
 app.use('/api/game', gameRoutes)
 app.use('/api/admin', adminRoutes)
 
-// ✅ Rota para verificar status da sala (POLLING)
+// ✅ Rota para verificar status da sala
 app.get('/api/room/status/:code', async (req, res) => {
   try {
     const { code } = req.params
-    
     if (rooms[code]) {
       return res.json({
         hostPaid: rooms[code].hostPaid || false,
         guestPaid: rooms[code].guestPaid || false
       })
     }
-    
-    const result = await db.query(
-      `SELECT host_paid, guest_paid FROM rooms WHERE code = $1`,
-      [code]
-    )
-    
-    if (result.rows.length === 0) {
-      return res.json({ hostPaid: false, guestPaid: false })
-    }
-    
-    res.json({
-      hostPaid: result.rows[0].host_paid,
-      guestPaid: result.rows[0].guest_paid
-    })
+    const result = await db.query(`SELECT host_paid, guest_paid FROM rooms WHERE code = $1`, [code])
+    if (result.rows.length === 0) return res.json({ hostPaid: false, guestPaid: false })
+    res.json({ hostPaid: result.rows[0].host_paid, guestPaid: result.rows[0].guest_paid })
   } catch (error) {
-    console.error('Erro ao verificar status da sala:', error)
+    console.error('Erro ao verificar status:', error)
     res.json({ hostPaid: false, guestPaid: false })
   }
 })
@@ -70,77 +57,43 @@ app.get('/api/room/status/:code', async (req, res) => {
 app.get('/api/room/:code', async (req, res) => {
   const room = rooms[req.params.code]
   if (!room) return res.json({ exists: false })
-  res.json({ 
-    exists: true, 
-    players: (room.host ? 1 : 0) + (room.guest ? 1 : 0),
-    started: room.started 
-  })
+  res.json({ exists: true, players: (room.host ? 1 : 0) + (room.guest ? 1 : 0), started: room.started })
 })
 
-// ✅ Rota para admin confirmar pagamento
+// ✅ Rota admin confirmar pagamento
 app.post('/api/confirm-payment', async (req, res) => {
   try {
     const { transactionId, password } = req.body
-    
-    console.log('💰 Admin confirmando pagamento:', transactionId)
-    
-    if (password !== 'admin123') {
-      console.log('❌ Password inválido')
-      return res.status(401).json({ success: false, error: 'Não autorizado' })
-    }
-    
-    console.log('✅ Admin autorizado!')
+    if (password !== 'admin123') return res.status(401).json({ success: false, error: 'Não autorizado' })
     
     await paymentService.confirmPayment(transactionId)
     
-    const txResult = await db.query(
-      `SELECT room_code, player_type FROM transactions WHERE id = $1`,
-      [transactionId]
-    )
-    
-    if (txResult.rows.length === 0) {
-      return res.json({ success: false, error: 'Transação não encontrada' })
-    }
+    const txResult = await db.query(`SELECT room_code, player_type FROM transactions WHERE id = $1`, [transactionId])
+    if (txResult.rows.length === 0) return res.json({ success: false, error: 'Transação não encontrada' })
     
     const roomCode = txResult.rows[0].room_code
     const playerType = txResult.rows[0].player_type
-    
-    console.log('📊 Sala:', roomCode, 'Player Type:', playerType)
-    
     const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
-    await db.query(
-      `UPDATE rooms SET ${column} = TRUE WHERE code = $1`,
-      [roomCode]
-    )
-    console.log('✅ rooms.' + column + ' atualizado para TRUE (banco)')
+    
+    await db.query(`UPDATE rooms SET ${column} = TRUE WHERE code = $1`, [roomCode])
     
     if (rooms[roomCode]) {
-      if (playerType === 'host') {
-        rooms[roomCode].hostPaid = true
-      } else {
-        rooms[roomCode].guestPaid = true
-      }
-      console.log('✅ rooms[' + roomCode + '] atualizado em memória')
-      console.log('📊 hostPaid:', rooms[roomCode].hostPaid, 'guestPaid:', rooms[roomCode].guestPaid)
+      rooms[roomCode][playerType === 'host' ? 'hostPaid' : 'guestPaid'] = true
     }
     
     const room = rooms[roomCode]
     if (room && room.hostPaid && room.guestPaid && room.host) {
-      console.log('✅ AMBOS PAGARAM! Emitindo bothPaid para:', room.host)
       io.to(room.host).emit('bothPaid', { roomId: roomCode })
     }
     
     res.json({ success: true })
   } catch (error) {
-    console.error('❌ Erro ao confirmar pagamento:', error)
+    console.error('Erro ao confirmar pagamento:', error)
     res.status(500).json({ success: false, error: error.message })
   }
 })
 
-// ✅ ROTA DO ADMIN PANEL
-app.get('/admin', (req, res) => {
-  res.sendFile(__dirname + '/public/admin.html')
-})
+app.get('/admin', (req, res) => res.sendFile(__dirname + '/public/admin.html'))
 
 app.get('/api/monetization-status', async (req, res) => {
   const settings = await adminService.getAllSettings()
@@ -152,46 +105,32 @@ app.get('/api/monetization-status', async (req, res) => {
   })
 })
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: Date.now() })
-})
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: Date.now() }))
 
 async function initDatabase() {
   try {
     const schema = fs.readFileSync('./database/schema.sql', 'utf8')
     await db.query(schema)
-    console.log('✅ Tabelas criadas/atualizadas!')
-    
-    await db.query(`
-      ALTER TABLE transactions 
-      ADD COLUMN IF NOT EXISTS player_type VARCHAR(20)
-    `)
-    console.log('✅ Coluna player_type adicionada!')
-    
+    await db.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS player_type VARCHAR(20)`)
+    console.log('✅ Banco pronto!')
   } catch (err) {
-    console.error('❌ Erro ao criar tabelas:', err.message)
+    console.error('❌ Erro banco:', err.message)
   }
 }
 
 // ============================================
-// ✅ SOCKET.IO - CONEXÕES
+// ✅ SOCKET.IO
 // ============================================
 io.on('connection', (socket) => {
   console.log('🔌 Conectado:', socket.id)
   sendRoomList()
 
-  // ✅ REGISTRAR USUÁRIO
   socket.on('register', async (username) => {
-    await db.query(
-      `INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = $2`,
-      [socket.id, username]
-    )
+    await db.query(`INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = $2`, [socket.id, username])
     users[socket.id] = { username }
     socket.emit('registered', { id: socket.id, username })
-    console.log('✅ Usuário registrado:', socket.id, username)
   })
 
-  // ✅ CRIAR SALA
   socket.on('createRoom', async () => {
     const room = await gameService.createRoom(socket.id)
     rooms[room.code] = { 
@@ -206,16 +145,11 @@ io.on('connection', (socket) => {
       hands: {},
       turn: socket.id
     }
-    console.log('🏠 Sala criada:', room.code, 'Host:', socket.id)
+    console.log('🏠 Sala criada:', room.code)
     
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
-      socket.emit('paymentRequired', {
-        amount: parseFloat(settings.entry_fee),
-        roomId: room.code,
-        userId: socket.id,
-        playerType: 'host'
-      })
+      socket.emit('paymentRequired', { amount: parseFloat(settings.entry_fee), roomId: room.code, userId: socket.id, playerType: 'host' })
     } else {
       await paymentService.markRoomPaid(room.code, 'host')
       rooms[room.code].hostPaid = true
@@ -224,108 +158,69 @@ io.on('connection', (socket) => {
     sendRoomList()
   })
 
-  // ✅ ENTRAR NA SALA
   socket.on('joinRoom', async (code) => {
     const room = await gameService.getRoom(code)
     if (!room) return socket.emit('error', { message: 'Sala não existe' })
     if (room.started) return socket.emit('error', { message: 'Jogo já começou' })
     if (room.guest_id) return socket.emit('error', { message: 'Sala cheia' })
-    if (room.host_id === socket.id) return socket.emit('error', { message: 'Você já é o host!' })
+    if (room.host_id === socket.id) return socket.emit('error', { message: 'Você é o host!' })
 
     await gameService.joinRoom(code, socket.id)
     
-    if (!rooms[code]) {
-      rooms[code] = { 
-        code: code, 
-        host: room.host_id, 
-        guest: socket.id,
-        hostPaid: room.host_paid, 
-        guestPaid: room.guest_paid, 
-        started: room.started,
-        board: [],
-        deck: [],
-        hands: {},
-        turn: room.host_id
-      }
-    } else {
-      rooms[code].guest = socket.id
-      rooms[code].guest_id = socket.id
+    rooms[code] = { 
+      code: code, 
+      host: room.host_id, 
+      guest: socket.id,
+      hostPaid: room.host_paid, 
+      guestPaid: room.guest_paid, 
+      started: room.started,
+      board: [],
+      deck: [],
+      hands: {},
+      turn: room.host_id
     }
     
-    console.log('👤 Guest entrou:', code, 'Socket:', socket.id)
+    console.log('👤 Guest entrou:', code)
 
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
-      socket.emit('paymentRequired', {
-        amount: parseFloat(settings.entry_fee),
-        roomId: code,
-        userId: socket.id,
-        playerType: 'guest'
-      })
+      socket.emit('paymentRequired', { amount: parseFloat(settings.entry_fee), roomId: code, userId: socket.id, playerType: 'guest' })
     } else {
       await paymentService.markRoomPaid(code, 'guest')
       rooms[code].guestPaid = true
-      io.to(rooms[code].host).emit('guestJoined', { code, guestId: socket.id })
+      io.to(rooms[code].host).emit('guestJoined', { code })
       io.to(rooms[code].host).emit('bothPaid', { roomId: code })
       socket.emit('roomJoined', { code })
     }
     sendRoomList()
   })
 
-  // ✅ INICIAR JOGO
   socket.on('startGame', async (code) => {
     const room = rooms[code]
-    console.log('🎮 startGame recebido - code:', code, 'socket.id:', socket.id)
-    
     if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
     if (room.host !== socket.id) return socket.emit('error', { message: 'Apenas host pode iniciar' })
     if (!room.guest) return socket.emit('error', { message: 'Aguarde o convidado' })
-    
-    const settings = await adminService.getAllSettings()
-    if (settings.monetization_enabled === 'true') {
-      if (!room.hostPaid || !room.guestPaid) {
-        return socket.emit('error', { message: 'Ambos devem pagar!' })
-      }
-    }
-    
     if (room.started) return
+
+    const settings = await adminService.getAllSettings()
+    if (settings.monetization_enabled === 'true' && (!room.hostPaid || !room.guestPaid)) {
+      return socket.emit('error', { message: 'Ambos devem pagar!' })
+    }
 
     await gameService.startGame(code)
     rooms[code].started = true
     
     const deck = generateDeck()
     rooms[code].deck = deck.slice(14)
-    rooms[code].hands = {
-      [room.host]: deck.slice(0, 7),
-      [room.guest]: deck.slice(7, 14)
-    }
+    rooms[code].hands = { [room.host]: deck.slice(0, 7), [room.guest]: deck.slice(7, 14) }
     rooms[code].board = []
     rooms[code].turn = room.host
 
-    console.log('🎮 Jogo iniciado:', code)
-
-    io.to(room.host).emit('gameStart', {
-      hand: rooms[code].hands[room.host],
-      isHost: true,
-      deckCount: rooms[code].deck.length,
-      opponent: users[room.guest]?.username || 'Oponente'
-    })
-
-    io.to(room.guest).emit('gameStart', {
-      hand: rooms[code].hands[room.guest],
-      isHost: false,
-      deckCount: rooms[code].deck.length,
-      opponent: users[room.host]?.username || 'Oponente'
-    })
-
-    io.emit('update', {
-      board: [],
-      turn: rooms[code].turn,
-      deckCount: rooms[code].deck.length
-    })
+    io.to(room.host).emit('gameStart', { hand: rooms[code].hands[room.host], isHost: true, deckCount: rooms[code].deck.length, opponent: users[room.guest]?.username || 'Oponente' })
+    io.to(room.guest).emit('gameStart', { hand: rooms[code].hands[room.guest], isHost: false, deckCount: rooms[code].deck.length, opponent: users[room.host]?.username || 'Oponente' })
+    io.emit('update', { board: [], turn: rooms[code].turn, deckCount: rooms[code].deck.length })
   })
 
-  // ✅ JOGAR PEDRA
   socket.on('play', async ({ code, tile, side }) => {
     const room = rooms[code]
     if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
@@ -343,7 +238,6 @@ io.on('connection', (socket) => {
     } else {
       const left = room.board[0][0], right = room.board[room.board.length - 1][1]
       let played = false
-
       if (side === 'left') {
         if (tile1 === left) { room.board.unshift([tile0, tile1]); played = true }
         else if (tile0 === left) { room.board.unshift([tile1, tile0]); played = true }
@@ -358,13 +252,8 @@ io.on('connection', (socket) => {
     hand.splice(tileIndex, 1)
 
     if (hand.length === 0) {
-      console.log('🏆 Vencedor:', socket.id, 'Sala:', code)
-      
       const settings = await adminService.getAllSettings()
-      if (settings.monetization_enabled === 'true') {
-        await paymentService.recordHouseFee(code, parseFloat(settings.house_fee))
-      }
-      
+      if (settings.monetization_enabled === 'true') await paymentService.recordHouseFee(code, parseFloat(settings.house_fee))
       await gameService.endGame(code, socket.id)
       io.emit('gameOver', { winner: socket.id })
       delete rooms[code]
@@ -373,129 +262,44 @@ io.on('connection', (socket) => {
     }
 
     room.turn = room.turn === room.host ? room.guest : room.host
-    console.log('🎴 Jogada realizada! Próximo turno:', room.turn)
-
-    socket.emit('tilePlayed', {
-      hand: room.hands[socket.id],
-      board: room.board,
-      turn: room.turn,
-      deckCount: room.deck.length
-    })
-
-    io.emit('update', {
-      board: room.board,
-      turn: room.turn,
-      deckCount: room.deck.length
-    })
+    socket.emit('tilePlayed', { hand: room.hands[socket.id], board: room.board, turn: room.turn, deckCount: room.deck.length })
+    io.emit('update', { board: room.board, turn: room.turn, deckCount: room.deck.length })
   })
 
-  // ✅ COMPRAR PEDRA
   socket.on('buyTile', ({ code }) => {
     const room = rooms[code]
-    if (!room || room.turn !== socket.id || room.deck.length === 0) {
-      return socket.emit('error', { message: 'Erro ao comprar' })
-    }
+    if (!room || room.turn !== socket.id || room.deck.length === 0) return socket.emit('error', { message: 'Erro ao comprar' })
     const tile = room.deck.pop()
     room.hands[socket.id].push(tile)
-    socket.emit('tileBought', {
-      hand: room.hands[socket.id],
-      deckCount: room.deck.length,
-      board: room.board
-    })
+    socket.emit('tileBought', { hand: room.hands[socket.id], deckCount: room.deck.length, board: room.board })
   })
 
-  // ✅ PASSAR TURNO
   socket.on('passTurn', ({ code }) => {
     const room = rooms[code]
     if (!room || room.turn !== socket.id) return
     room.turn = room.turn === room.host ? room.guest : room.host
-    console.log('⏭️ Turno passado! Próximo:', room.turn)
     io.emit('update', { board: room.board, turn: room.turn, deckCount: room.deck.length })
   })
 
-  // ✅ PAGAMENTO CONFIRMADO PELO JOGADOR
-  socket.on('paymentConfirmed', async (data) => {
-    console.log('💰 Pagamento confirmado pelo jogador:', data)
-  })
+  socket.on('paymentConfirmed', (data) => console.log('💰 Pagamento confirmado:', data))
 
-  // ✅ DISCONNECT - LIMPAR SALA
-  socket.on('disconnect', async () => {
+  // ✅ DISCONNECT SUAVE - Não deleta sala imediatamente
+  socket.on('disconnect', () => {
     console.log('❌ Disconnect:', socket.id)
-    
-    for (const code in rooms) {
-      const room = rooms[code]
-      if (!room) continue
-
-      // HOST SAIU
-      if (room.host === socket.id) {
-        console.log('👑 Host saiu da sala:', code)
-        
-        try {
-          await db.query(`UPDATE rooms SET started = FALSE WHERE code = $1`, [code])
-        } catch (err) {
-          console.log('Erro DB ao encerrar sala:', err.message)
-        }
-
-        if (room.guest) {
-          io.to(room.guest).emit('error', { message: 'O host saiu. A sala foi encerrada.' })
-        }
-
-        delete rooms[code]
-        sendRoomList()
-        break
-      }
-
-      // GUEST SAIU
-      if (room.guest === socket.id) {
-        console.log('🎲 Guest saiu da sala:', code)
-
-        room.guest = null
-        room.guestPaid = false
-        room.started = false
-        room.board = []
-        room.deck = []
-        room.hands = {}
-        room.turn = room.host
-
-        try {
-          await db.query(
-            `UPDATE rooms SET guest_id = NULL, guest_paid = FALSE, started = FALSE WHERE code = $1`,
-            [code]
-          )
-        } catch (err) {
-          console.log('Erro DB ao resetar sala:', err.message)
-        }
-
-        io.to(room.host).emit('error', { message: 'Oponente saiu. Aguardando novo jogador.' })
-        sendRoomList()
-        break
-      }
-    }
+    // ✅ Não deleta a sala, mantém para reconexão
+    sendRoomList()
   })
 })
 
-// ✅ ENVIAR LISTA DE SALAS
 function sendRoomList() {
-  const list = Object.values(rooms).map(r => ({
-    code: r.code,
-    players: (r.host ? 1 : 0) + (r.guest ? 1 : 0),
-    started: r.started,
-    hostPaid: r.hostPaid || false,
-    guestPaid: r.guestPaid || false
-  }))
+  const list = Object.values(rooms).map(r => ({ code: r.code, players: (r.host ? 1 : 0) + (r.guest ? 1 : 0), started: r.started, hostPaid: r.hostPaid || false, guestPaid: r.guestPaid || false }))
   io.emit('roomList', list)
 }
 
-// ✅ INICIAR SERVIDOR
 const PORT = process.env.PORT || 3000
-
 initDatabase().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log('============================================')
     console.log('🚀 Servidor na porta', PORT)
-    console.log('🔐 Admin: http://localhost:' + PORT + '/admin')
     console.log('🎮 Jogo: http://localhost:' + PORT)
-    console.log('📊 PostgreSQL: Conectado')
-    console.log('============================================')
   })
 })

@@ -24,13 +24,58 @@
     .deck-pile { width: 45px; height: 65px; background: #2d5a3d; border: 3px dashed #ffd700; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ffd700; font-weight: bold; }
     #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
     #turn.active { background: #28a745; }
-    .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 8px; margin: 8px 0; overflow-x: auto; }
-    .board { display: flex; align-items: center; gap: 3px; min-height: 70px; }
-    .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; flex-shrink: 0; background: rgba(255,215,0,0.1); }
+    
+    /* ✅ MESA COM SCROLL */
+    .board-container { 
+      background: #1a472a; 
+      border: 4px solid #3d2817; 
+      border-radius: 10px; 
+      padding: 8px; 
+      margin: 8px 0; 
+      overflow-x: auto; 
+      position: relative;
+    }
+    .board { 
+      display: flex; 
+      align-items: center; 
+      gap: 3px; 
+      min-height: 70px; 
+      padding: 10px;
+      min-width: max-content;
+    }
+    
+    /* ✅ SETAS DE SCROLL */
+    .scroll-indicator {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 24px;
+      color: #ffd700;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 10;
+    }
+    .scroll-indicator.left { left: 5px; }
+    .scroll-indicator.right { right: 5px; }
+    .scroll-indicator.visible { opacity: 1; }
+    
+    .drop-zone { 
+      width: 32px; 
+      height: 55px; 
+      border: 2px dashed #ffd700; 
+      border-radius: 6px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      color: #ffd700; 
+      flex-shrink: 0; 
+      background: rgba(255,215,0,0.1); 
+    }
     .drop-zone.hidden { display: none; }
     
-    /* ✅ DOMINÓ COM PONTINHOS (PIPS) */
-    .domino { 
+    /* ✅ DOMINÓ NA MÃO (VERTICAL) */
+    .domino-hand { 
       width: 32px; 
       height: 60px; 
       background: #f5f5dc; 
@@ -40,12 +85,25 @@
       border: 2px solid #8b7355; 
       flex-shrink: 0;
       cursor: grab;
+      transition: transform 0.2s, opacity 0.2s;
     }
-    .domino.horizontal { 
+    .domino-hand.dragging { 
+      opacity: 0.5; 
+      transform: scale(1.1); 
+    }
+    
+    /* ✅ DOMINÓ NA MESA (HORIZONTAL) */
+    .domino-board { 
       width: 60px; 
       height: 32px; 
+      background: #f5f5dc; 
+      border-radius: 5px; 
+      display: flex; 
       flex-direction: row; 
+      border: 2px solid #8b7355; 
+      flex-shrink: 0;
     }
+    
     .domino-face { 
       flex: 1; 
       display: grid; 
@@ -54,8 +112,8 @@
       padding: 2px; 
       gap: 1px; 
     }
-    .domino-face.top { border-bottom: 2px solid #8b7355; }
-    .domino.horizontal .domino-face.top { border-bottom: none; border-right: 2px solid #8b7355; }
+    .domino-hand .domino-face.top { border-bottom: 2px solid #8b7355; }
+    .domino-board .domino-face.left { border-right: 2px solid #8b7355; }
     
     /* ✅ PONTINHOS DO DOMINÓ */
     .pip { 
@@ -137,7 +195,9 @@
     <button class="btn-blue" onclick="buyTile()">🛒 Comprar</button>
     <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
   </div>
-  <div class="board-container">
+  <div class="board-container" id="boardContainer">
+    <div class="scroll-indicator left" id="scrollLeft">◀</div>
+    <div class="scroll-indicator right" id="scrollRight">▶</div>
     <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;">📌 Mesa</h3>
     <div class="board">
       <div class="drop-zone hidden" id="dropLeft">⬅️</div>
@@ -157,9 +217,30 @@
 const socket = io()
 let room = null, myId = null, myTurn = false, isHost = false, hand = [], deck = 14
 let currentTransactionId = null, paymentCheckInterval = null, paymentData = null, hostCheckInterval = null
-let draggedTile = null
+let draggedTile = null, draggedElement = null
 
 const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
+
+// ✅ ATUALIZAR SETAS DE SCROLL
+function updateScrollIndicators() {
+  const container = document.getElementById('boardContainer')
+  const scrollLeft = document.getElementById('scrollLeft')
+  const scrollRight = document.getElementById('scrollRight')
+  
+  if (!container) return
+  
+  if (container.scrollLeft > 10) {
+    scrollLeft.classList.add('visible')
+  } else {
+    scrollLeft.classList.remove('visible')
+  }
+  
+  if (container.scrollLeft < container.scrollWidth - container.clientWidth - 10) {
+    scrollRight.classList.add('visible')
+  } else {
+    scrollRight.classList.remove('visible')
+  }
+}
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
@@ -302,6 +383,7 @@ socket.on('gameStart', (data) => {
     document.getElementById('turn').innerText = '⏳ Oponente...'
     hideZones()
   }
+  updateScrollIndicators()
 })
 
 socket.on('update', (data) => {
@@ -318,6 +400,7 @@ socket.on('update', (data) => {
     myTurn = false
     hideZones()
   }
+  updateScrollIndicators()
 })
 
 socket.on('tilePlayed', (data) => {
@@ -337,6 +420,7 @@ socket.on('tilePlayed', (data) => {
     myTurn = false
     hideZones()
   }
+  updateScrollIndicators()
 })
 
 socket.on('tileBought', (data) => {
@@ -355,21 +439,44 @@ socket.on('gameOver', () => { alert('🏆 Fim!'); location.reload() })
 function handleDragStart(e) {
   if (!myTurn) { e.preventDefault(); return }
   draggedTile = { v1: parseInt(e.target.getAttribute('data-v1')), v2: parseInt(e.target.getAttribute('data-v2')) }
+  draggedElement = e.target.closest('.domino-hand')
+  if (draggedElement) {
+    draggedElement.classList.add('dragging')
+  }
   e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', JSON.stringify(draggedTile))
+}
+
+function handleDragEnd(e) {
+  if (draggedElement) {
+    draggedElement.classList.remove('dragging')
+    draggedElement = null
+  }
 }
 
 // ✅ TOUCH MOBILE
 function handleTouchStart(e) {
   if (!myTurn) return
   e.preventDefault()
-  const target = e.target.closest('.domino')
+  const target = e.target.closest('.domino-hand')
   if (!target) return
   draggedTile = { v1: parseInt(target.getAttribute('data-v1')), v2: parseInt(target.getAttribute('data-v2')) }
-  target.style.opacity = '0.5'
+  draggedElement = target
+  draggedElement.classList.add('dragging')
+}
+
+function handleTouchMove(e) {
+  if (!draggedElement) return
+  e.preventDefault()
+  const touch = e.touches[0]
+  draggedElement.style.position = 'fixed'
+  draggedElement.style.left = (touch.clientX - 16) + 'px'
+  draggedElement.style.top = (touch.clientY - 30) + 'px'
+  draggedElement.style.zIndex = '1000'
 }
 
 function handleTouchEnd(e) {
-  if (!draggedTile) return
+  if (!draggedElement) return
   e.preventDefault()
   const touch = e.changedTouches[0]
   let side = null
@@ -388,8 +495,12 @@ function handleTouchEnd(e) {
     socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
   }
   
-  // Reset opacity
-  document.querySelectorAll('.domino').forEach(d => d.style.opacity = '1')
+  draggedElement.classList.remove('dragging')
+  draggedElement.style.position = ''
+  draggedElement.style.left = ''
+  draggedElement.style.top = ''
+  draggedElement.style.zIndex = ''
+  draggedElement = null
   draggedTile = null
 }
 
@@ -402,29 +513,41 @@ function isOverElement(x, y, element) {
 function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
 function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
 
-// ✅ RENDERIZA MÃO COM PONTINHOS
+// ✅ RENDERIZA MÃO (VERTICAL)
 function renderHand(h) {
   if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
-  document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false)).join('')
+  document.getElementById('hand').innerHTML = h.map(t => createDominoHand(t[0], t[1])).join('')
 }
 
-// ✅ RENDERIZA MESA COM PONTINHOS
+// ✅ RENDERIZA MESA (HORIZONTAL)
 function renderBoard(b) {
   if (!b || !Array.isArray(b)) return
-  document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
+  document.getElementById('boardTiles').innerHTML = b.map(t => createDominoBoard(t[0], t[1])).join('')
+  setTimeout(updateScrollIndicators, 100)
 }
 
-// ✅ CRIA DOMINÓ COM PONTINHOS (PIPS)
-function createDomino(v1, v2, horizontal) {
+// ✅ DOMINÓ NA MÃO (VERTICAL)
+function createDominoHand(v1, v2) {
   const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
-  return '<div class="domino ' + (horizontal ? 'horizontal' : '') + '" ' +
-    'draggable="' + (!horizontal && myTurn) + '" ' +
+  return '<div class="domino-hand" ' +
+    'draggable="' + myTurn + '" ' +
     'ondragstart="handleDragStart(event)" ' +
+    'ondragend="handleDragEnd(event)" ' +
     'ontouchstart="handleTouchStart(event)" ' +
+    'ontouchmove="handleTouchMove(event)" ' +
     'ontouchend="handleTouchEnd(event)" ' +
     'data-v1="' + v1 + '" data-v2="' + v2 + '">' +
     '<div class="domino-face top v' + v1 + '">' + pips + '</div>' +
     '<div class="domino-face bottom v' + v2 + '">' + pips + '</div>' +
+  '</div>'
+}
+
+// ✅ DOMINÓ NA MESA (HORIZONTAL)
+function createDominoBoard(v1, v2) {
+  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
+  return '<div class="domino-board" data-v1="' + v1 + '" data-v2="' + v2 + '">' +
+    '<div class="domino-face left v' + v1 + '">' + pips + '</div>' +
+    '<div class="domino-face right v' + v2 + '">' + pips + '</div>' +
   '</div>'
 }
 
@@ -466,6 +589,14 @@ function getBoardEnds(board) {
   if (!board || board.length === 0) return { left: null, right: null }
   return { left: parseInt(board[0][0]), right: parseInt(board[board.length - 1][1]) }
 }
+
+// ✅ LISTENER PARA SCROLL
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('boardContainer')
+  if (container) {
+    container.addEventListener('scroll', updateScrollIndicators)
+  }
+})
 </script>
 </body>
 </html>

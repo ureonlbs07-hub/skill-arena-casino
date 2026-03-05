@@ -1,3 +1,480 @@
-git add public/index.html
-git commit -m "fix: INLINE STYLE À PROVA DE BOICOTE - pecas deitadas na mesa"
-git push origin main
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dominó - Skill Arena</title>
+ <style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: sans-serif; background: #1a472a; color: white; padding: 5px; min-height: 100vh; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .card { background: rgba(0,0,0,0.8); border-radius: 15px; padding: 15px; max-width: 400px; margin: 20px auto; }
+  h1 { text-align: center; color: #ffd700; margin-bottom: 15px; }
+  input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 2px solid #ffd700; background: rgba(0,0,0,0.6); color: white; }
+  button { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  .btn-green { background: #28a745; color: white; }
+  .btn-blue { background: #007bff; color: white; }
+  .btn-red { background: #dc3545; color: white; }
+  .btn-yellow { background: #ffc107; color: black; }
+  .hidden { display: none; }
+  #rooms { list-style: none; }
+  #rooms li { padding: 10px; margin: 5px 0; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: space-between; }
+  .player-bar { display: flex; justify-content: space-between; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px; margin-bottom: 10px; }
+  .deck-pile { width: 45px; height: 65px; background: #2d5a3d; border: 3px dashed #ffd700; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ffd700; font-weight: bold; }
+  #turn { text-align: center; padding: 12px; background: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px 0; font-weight: bold; }
+  #turn.active { background: #28a745; }
+  .board-container { background: #1a472a; border: 4px solid #3d2817; border-radius: 10px; padding: 8px; margin: 8px 0; overflow-x: auto; }
+  .board { display: flex; align-items: center; gap: 3px; min-height: 70px; }
+  .drop-zone { width: 32px; height: 55px; border: 2px dashed #ffd700; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #ffd700; flex-shrink: 0; background: rgba(255,215,0,0.1); }
+  .drop-zone.hidden { display: none; }
+  
+  /* ✅ DOMINÓ NA MÃO - VERTICAL (30x60) */
+  .domino { 
+    width: 30px !important; 
+    height: 60px !important; 
+    background: #f5f5dc !important; 
+    border-radius: 5px !important; 
+    display: flex !important; 
+    flex-direction: column !important; 
+    border: 2px solid #8b7355 !important; 
+    flex-shrink: 0 !important;
+    cursor: grab !important;
+  }
+  .domino.dragging { opacity: 0.5 !important; }
+  
+  /* ✅ DOMINÓ NA MESA - HORIZONTAL (60x30) - CLASSE .mesa */
+  .domino.mesa { 
+    width: 60px !important; 
+    height: 30px !important; 
+    flex-direction: row !important; 
+  }
+  
+  .domino-face { 
+    flex: 1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: repeat(3, 1fr) !important;
+    padding: 2px !important;
+    gap: 1px !important;
+  }
+  .domino .domino-face.top { border-bottom: 2px solid #8b7355 !important; }
+  .domino.mesa .domino-face.top { border-bottom: none !important; border-right: 2px solid #8b7355 !important; }
+  
+  .pip { background: #000; border-radius: 50%; width: 4px; height: 4px; justify-self: center; align-self: center; display: none; }
+  .v0 .pip { display: none; }
+  .v1 .p5 { display: block; }
+  .v2 .p1, .v2 .p9 { display: block; }
+  .v3 .p1, .v3 .p5, .v3 .p9 { display: block; }
+  .v4 .p1, .v4 .p3, .v4 .p7, .v4 .p9 { display: block; }
+  .v5 .p1, .v5 .p3, .v5 .p5, .v5 .p7, .v5 .p9 { display: block; }
+  .v6 .p1, .v6 .p3, .v6 .p4, .v6 .p6, .v6 .p7, .v6 .p9 { display: block; }
+  
+  .hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; min-height: 70px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 8px; }
+  #action-buttons { display: flex; gap: 8px; justify-content: center; margin: 8px 0; }
+  #action-buttons button { width: auto; padding: 10px 18px; font-size: 13px; }
+  .dev-signature { text-align: center; margin-top: 20px; color: rgba(255,255,255,0.5); font-size: 11px; }
+  #pixQRCode { max-width: 200px; margin: 15px auto; display: block; }
+  #pixCode { font-family: monospace; font-size: 10px; background: #000; padding: 10px; border-radius: 8px; word-break: break-all; }
+  .payment-info { background: rgba(255,215,0,0.1); border: 1px solid #ffd700; border-radius: 8px; padding: 12px; margin: 15px 0; text-align: center; }
+  .payment-warning { background: rgba(255,193,7,0.2); border: 1px solid #ffc107; border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="screen active">
+  <div class="card">
+    <h1>🎲 Dominó</h1>
+    <input id="username" placeholder="Seu nome">
+    <button class="btn-green" onclick="register()">Entrar</button>
+  </div>
+</div>
+
+<div id="menu-screen" class="screen">
+  <div class="card">
+    <h1>🎲 Dominó</h1>
+    <button class="btn-green" onclick="createRoom()">Criar Sala</button>
+    <h3 style="color:#ffd700;margin-top:15px;">Salas</h3>
+    <ul id="rooms"></ul>
+  </div>
+</div>
+
+<div id="payment-screen" class="screen">
+  <div class="card">
+    <h1>💰 Pagamento PIX</h1>
+    <div class="payment-info"><strong>R$ 10,00</strong></div>
+    <div class="payment-warning">⚠️ Após pagar, clique em "✅ Já Paguei"</div>
+    <img id="pixQRCode" src="/pix-qr-code.png" alt="PIX">
+    <p id="pixCode" onclick="copyPixCode()">📋 Copiar</p>
+    <p id="paymentStatus">⏳ Aguardando...</p>
+    <button class="btn-green" onclick="confirmPaymentManual()">✅ Já Paguei</button>
+    <button class="btn-red" onclick="cancelPayment()">❌ Cancelar</button>
+  </div>
+</div>
+
+<div id="wait-screen" class="screen">
+  <div class="card">
+    <h1>⏳ Aguardando</h1>
+    <p id="waitMessage" style="font-size:1.2em;margin:20px 0;">...</p>
+    <button id="startBtn" class="btn-red hidden" onclick="startGame()">🚀 INICIAR</button>
+  </div>
+</div>
+
+<div id="game-screen" class="screen">
+  <div class="player-bar">
+    <div>👤 Você: <b id="myCount">7</b></div>
+    <div class="deck-pile" onclick="buyTile()"><span id="deckCount">14</span></div>
+    <div>👤 Oponente: <b id="oppCount">7</b></div>
+  </div>
+  <div id="turn">⏳ Aguardando...</div>
+  <div id="action-buttons" class="hidden">
+    <button class="btn-blue" onclick="buyTile()">🛒 Comprar</button>
+    <button class="btn-yellow hidden" id="passBtn" onclick="passTurn()">⏭️ Passar</button>
+  </div>
+  <div class="board-container">
+    <h3 style="text-align:center;color:#ffd700;margin-bottom:8px;">📌 Mesa</h3>
+    <div class="board">
+      <div class="drop-zone hidden" id="dropLeft">⬅️</div>
+      <div id="boardTiles"></div>
+      <div class="drop-zone hidden" id="dropRight">➡️</div>
+      <div class="drop-zone hidden" id="dropCenter">🎲</div>
+    </div>
+  </div>
+  <h3 style="text-align:center;color:#ffd700;margin-top:15px;">🎮 Sua Mão</h3>
+  <div class="hand" id="hand"></div>
+</div>
+
+<div class="dev-signature">Powered by <strong>Gabriel Archanjo Lima</strong></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io()
+let room = null, myId = null, myTurn = false, isHost = false, hand = [], deck = 14
+let currentTransactionId = null, paymentCheckInterval = null, paymentData = null, hostCheckInterval = null
+let draggedTile = null
+
+const PIX_COPY_PASTE = "00020101021126330014br.gov.bcb.pix011122480649857520400005303986540510.005802BR5914GABRIEL A LIMA6009SAO PAULO62070503***63042EC2"
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.getElementById(id).classList.add('active')
+  if (id === 'wait-screen' && isHost && room) startHostPaymentCheck()
+}
+
+function startHostPaymentCheck() {
+  if (hostCheckInterval) clearInterval(hostCheckInterval)
+  hostCheckInterval = setInterval(async () => {
+    if (!room || !isHost) return
+    try {
+      const res = await fetch(`/api/room/status/${room}`)
+      const result = await res.json()
+      if (result.hostPaid && result.guestPaid) {
+        clearInterval(hostCheckInterval)
+        document.getElementById('waitMessage').innerText = '✅ Ambos pagaram!'
+        document.getElementById('startBtn').classList.remove('hidden')
+      }
+    } catch (e) {}
+  }, 2000)
+}
+
+function register() {
+  const u = document.getElementById('username').value
+  if (!u) return alert('Nome!')
+  socket.emit('register', u)
+}
+
+socket.on('registered', (data) => { myId = data.id; showScreen('menu-screen') })
+function createRoom() { socket.emit('createRoom') }
+
+socket.on('roomCreated', (data) => {
+  room = data.code; isHost = true
+  showScreen('wait-screen')
+  document.getElementById('waitMessage').innerText = '👑 Aguardando...'
+  document.getElementById('startBtn').classList.add('hidden')
+})
+
+socket.on('roomList', (rooms) => {
+  const ul = document.getElementById('rooms')
+  ul.innerHTML = ''
+  if (rooms.length === 0) { ul.innerHTML = '<li style="color:#888">Nenhuma</li>'; return }
+  rooms.forEach(r => {
+    const st = r.players >= 2 ? '🔴 Cheia' : '🟡 ' + r.players + '/2'
+    ul.innerHTML += '<li><span><b>' + r.code + '</b> (' + st + ')</span><button class="btn-blue" style="width:auto;padding:5px 10px;" ' + (r.players >= 2 ? 'disabled' : '') + ' onclick="joinRoom(\'' + r.code + '\')">Entrar</button></li>'
+  })
+})
+
+function joinRoom(code) { socket.emit('joinRoom', code) }
+
+socket.on('roomJoined', (data) => {
+  room = data.code; isHost = false
+  showScreen('wait-screen')
+  document.getElementById('waitMessage').innerText = '🎲 Aguardando host...'
+  document.getElementById('startBtn').classList.add('hidden')
+})
+
+socket.on('bothPaid', (data) => {
+  if (isHost && room) {
+    document.getElementById('waitMessage').innerText = '✅ Ambos pagaram!'
+    document.getElementById('startBtn').classList.remove('hidden')
+  }
+})
+
+socket.on('paymentRequired', (data) => {
+  currentTransactionId = null
+  isHost = (data.playerType === 'host')
+  if (data.roomId) room = data.roomId
+  createPayment(data)
+})
+
+async function createPayment(data) {
+  paymentData = data
+  try {
+    const res = await fetch('/api/payment/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    const result = await res.json()
+    if (result.success) {
+      currentTransactionId = result.transactionId
+      document.getElementById('pixCode').innerText = PIX_COPY_PASTE
+    }
+  } catch (e) {}
+  showScreen('payment-screen')
+}
+
+function confirmPaymentManual() {
+  if (!currentTransactionId) return
+  document.getElementById('paymentStatus').innerText = '⏳ Aguardando admin...'
+  socket.emit('paymentConfirmed', { transactionId: currentTransactionId, roomId: paymentData?.roomId, playerType: paymentData?.playerType })
+  startAdminConfirmationCheck()
+}
+
+function startAdminConfirmationCheck() {
+  paymentCheckInterval = setInterval(async () => {
+    if (!currentTransactionId) return
+    try {
+      const res = await fetch(`/api/payment/status/${currentTransactionId}`)
+      const result = await res.json()
+      if (result.status === 'completed') {
+        clearInterval(paymentCheckInterval)
+        document.getElementById('paymentStatus').innerText = '✅ Confirmado!'
+        setTimeout(() => {
+          showScreen('wait-screen')
+          if (!room && paymentData?.roomId) room = paymentData.roomId
+          document.getElementById('waitMessage').innerText = paymentData?.playerType === 'host' ? '👑 Aguardando...' : '🎲 Aguardando...'
+        }, 2000)
+      }
+    } catch (e) {}
+  }, 5000)
+}
+
+function copyPixCode() { navigator.clipboard.writeText(PIX_COPY_PASTE); alert('PIX copiado! ✅') }
+function cancelPayment() { if (paymentCheckInterval) clearInterval(paymentCheckInterval); currentTransactionId = null; paymentData = null; showScreen('menu-screen') }
+
+function startGame() {
+  if (!room) return alert('Erro!')
+  if (!isHost) return alert('Apenas host!')
+  socket.emit('startGame', room)
+}
+
+socket.on('gameStart', (data) => {
+  hand = data.hand || []
+  deck = data.deckCount || 14
+  isHost = data.isHost || false
+  showScreen('game-screen')
+  renderHand(hand)
+  document.getElementById('myCount').innerText = hand.length
+  document.getElementById('deckCount').innerText = deck
+  if (isHost) {
+    myTurn = true
+    document.getElementById('turn').innerText = '✅ SUA VEZ!'
+    document.getElementById('turn').classList.add('active')
+    document.getElementById('dropCenter').classList.remove('hidden')
+  } else {
+    myTurn = false
+    document.getElementById('turn').innerText = '⏳ Oponente...'
+    hideZones()
+  }
+})
+
+socket.on('update', (data) => {
+  if (data.board) renderBoard(data.board)
+  if (data.deckCount !== undefined) { deck = data.deckCount; document.getElementById('deckCount').innerText = deck }
+  if (data.turn === myId) {
+    document.getElementById('turn').innerText = '✅ SUA VEZ!'
+    document.getElementById('turn').classList.add('active')
+    myTurn = true
+    checkMoves(data.board)
+  } else {
+    document.getElementById('turn').innerText = '⏳ Oponente...'
+    document.getElementById('turn').classList.remove('active')
+    myTurn = false
+    hideZones()
+  }
+})
+
+socket.on('tilePlayed', (data) => {
+  hand = data.hand || []
+  deck = data.deckCount || 14
+  renderHand(hand)
+  document.getElementById('myCount').innerText = hand.length
+  document.getElementById('deckCount').innerText = deck
+  renderBoard(data.board)
+  if (data.turn === myId) {
+    document.getElementById('turn').innerText = '✅ SUA VEZ!'
+    document.getElementById('turn').classList.add('active')
+    myTurn = true
+    checkMoves(data.board)
+  } else {
+    document.getElementById('turn').innerText = '⏳ Oponente...'
+    myTurn = false
+    hideZones()
+  }
+})
+
+socket.on('tileBought', (data) => {
+  hand = data.hand || []
+  deck = data.deckCount || 14
+  renderHand(hand)
+  document.getElementById('myCount').innerText = hand.length
+  document.getElementById('deckCount').innerText = deck
+  checkMoves(data.board)
+})
+
+socket.on('error', (data) => alert('Erro: ' + data.message))
+socket.on('gameOver', () => { alert('🏆 Fim!'); location.reload() })
+
+function handleDragStart(e) {
+  if (!myTurn) { e.preventDefault(); return }
+  const domino = e.target.closest('.domino')
+  if (!domino) return
+  draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
+  domino.classList.add('dragging')
+}
+
+function handleDragEnd(e) {
+  const domino = e.target.closest('.domino')
+  if (domino) domino.classList.remove('dragging')
+  draggedTile = null
+}
+
+function handleDrop(e, side) {
+  e.preventDefault()
+  if (!draggedTile) return
+  socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  draggedTile = null
+}
+
+function allowDrop(e) { e.preventDefault() }
+
+function handleTouchStart(e) {
+  if (!myTurn) return
+  e.preventDefault()
+  const domino = e.target.closest('.domino')
+  if (!domino) return
+  draggedTile = { v1: parseInt(domino.getAttribute('data-v1')), v2: parseInt(domino.getAttribute('data-v2')) }
+  domino.style.opacity = '0.5'
+}
+
+function handleTouchEnd(e) {
+  if (!draggedTile) return
+  e.preventDefault()
+  const touch = e.changedTouches[0]
+  let side = null
+  const dropLeft = document.getElementById('dropLeft')
+  const dropRight = document.getElementById('dropRight')
+  const dropCenter = document.getElementById('dropCenter')
+  const boardTiles = document.getElementById('boardTiles')
+  if (isOverElement(touch.clientX, touch.clientY, dropLeft)) side = 'left'
+  else if (isOverElement(touch.clientX, touch.clientY, dropRight)) side = 'right'
+  else if (isOverElement(touch.clientX, touch.clientY, dropCenter)) side = 'center'
+  else if (isOverElement(touch.clientX, touch.clientY, boardTiles)) side = 'right'
+  if (side) socket.emit('play', { code: room, tile: [draggedTile.v1, draggedTile.v2], side: side })
+  document.querySelectorAll('.domino').forEach(d => d.style.opacity = '1')
+  draggedTile = null
+}
+
+function isOverElement(x, y, element) {
+  if (!element || element.classList.contains('hidden')) return false
+  const rect = element.getBoundingClientRect()
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
+function buyTile() { if (myTurn && room) socket.emit('buyTile', { code: room }) }
+function passTurn() { if (myTurn && room) socket.emit('passTurn', { code: room }) }
+
+function renderHand(h) {
+  if (!h || !Array.isArray(h) || h.length === 0) { document.getElementById('hand').innerHTML = '<p style="color:#888">Vazio</p>'; return }
+  document.getElementById('hand').innerHTML = h.map(t => createDomino(t[0], t[1], false)).join('')
+}
+
+function renderBoard(b) {
+  if (!b || !Array.isArray(b) || b.length === 0) { document.getElementById('boardTiles').innerHTML = ''; return }
+  document.getElementById('boardTiles').innerHTML = b.map(t => createDomino(t[0], t[1], true)).join('')
+}
+
+function createDomino(v1, v2, horizontal) {
+  const pips = '<div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div><div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div><div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>'
+  
+  if (horizontal) {
+    // ✅ MESA - INLINE STYLE QUE NÃO FALHA!
+    return '<div style="width:60px!important;height:30px!important;display:flex!important;flex-direction:row!important;background:#f5f5dc;border-radius:5px;border:2px solid #8b7355;flex-shrink:0;" data-v1="' + v1 + '" data-v2="' + v2 + '">' +
+      '<div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:2px;gap:1px;border-right:2px solid #8b7355;" class="v' + v1 + '">' + pips + '</div>' +
+      '<div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:2px;gap:1px;" class="v' + v2 + '">' + pips + '</div></div>'
+  } else {
+    // ✅ MÃO - INLINE STYLE TAMBÉM!
+    return '<div style="width:30px!important;height:60px!important;display:flex!important;flex-direction:column!important;background:#f5f5dc;border-radius:5px;border:2px solid #8b7355;flex-shrink:0;cursor:grab;" draggable="' + myTurn + '" ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)" ontouchstart="handleTouchStart(event)" ontouchend="handleTouchEnd(event)" data-v1="' + v1 + '" data-v2="' + v2 + '">' +
+      '<div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:2px;gap:1px;border-bottom:2px solid #8b7355;" class="v' + v1 + '">' + pips + '</div>' +
+      '<div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:2px;gap:1px;" class="v' + v2 + '">' + pips + '</div></div>'
+  }
+}
+
+function hideZones() {
+  document.getElementById('dropCenter').classList.add('hidden')
+  document.getElementById('dropLeft').classList.add('hidden')
+  document.getElementById('dropRight').classList.add('hidden')
+}
+
+function checkMoves(board) {
+  if (!board || board.length === 0) {
+    document.getElementById('action-buttons').classList.add('hidden')
+    document.getElementById('dropCenter').classList.remove('hidden')
+    document.getElementById('dropLeft').classList.add('hidden')
+    document.getElementById('dropRight').classList.add('hidden')
+    return
+  }
+  const ends = getBoardEnds(board)
+  let can = hand.some(t => parseInt(t[0]) === ends.left || parseInt(t[1]) === ends.left || parseInt(t[0]) === ends.right || parseInt(t[1]) === ends.right)
+  if (can) {
+    document.getElementById('action-buttons').classList.add('hidden')
+    document.getElementById('dropCenter').classList.add('hidden')
+    document.getElementById('dropLeft').classList.remove('hidden')
+    document.getElementById('dropRight').classList.remove('hidden')
+  } else {
+    hideZones()
+    document.getElementById('action-buttons').classList.remove('hidden')
+    if (deck > 0) {
+      document.querySelector('#action-buttons .btn-blue').classList.remove('hidden')
+      document.getElementById('passBtn').classList.add('hidden')
+    } else {
+      document.querySelector('#action-buttons .btn-blue').classList.add('hidden')
+      document.getElementById('passBtn').classList.remove('hidden')
+    }
+  }
+}
+
+function getBoardEnds(board) {
+  if (!board || board.length === 0) return { left: null, right: null }
+  return { left: parseInt(board[0][0]), right: parseInt(board[board.length - 1][1]) }
+}
+
+function setupDropZones() {
+  const dropLeft = document.getElementById('dropLeft')
+  const dropRight = document.getElementById('dropRight')
+  const dropCenter = document.getElementById('dropCenter')
+  if (dropLeft) { dropLeft.addEventListener('dragover', allowDrop); dropLeft.addEventListener('drop', (e) => handleDrop(e, 'left')) }
+  if (dropRight) { dropRight.addEventListener('dragover', allowDrop); dropRight.addEventListener('drop', (e) => handleDrop(e, 'right')) }
+  if (dropCenter) { dropCenter.addEventListener('dragover', allowDrop); dropCenter.addEventListener('drop', (e) => handleDrop(e, 'center')) }
+}
+
+document.addEventListener('DOMContentLoaded', setupDropZones)
+</script>
+</body>
+</html>

@@ -103,32 +103,34 @@ button {
 
 #turn.active { background: #28a745; }
 
-.board-container {
-  background: #1a472a;
-  border: 4px solid #3d2817;
-  border-radius: 10px;
-  padding: 8px;
-  margin: 8px 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+.board-container{
+  background:#1a472a;
+  border:4px solid #3d2817;
+  border-radius:10px;
+  padding:8px;
+  margin:8px 0;
+
+  overflow-x:auto;
+  overflow-y:hidden;
 }
 
-/* Estrutura da mesa */
+/* linha da mesa */
 
-.board {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  min-height: 70px;
-  width: max-content;
-  flex-wrap: nowrap;
+.board{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  min-height:70px;
+
+  width:max-content;
 }
 
-#boardTiles {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  min-height: 40px;
+/* peças da mesa */
+
+#boardTiles{
+  display:flex;
+  align-items:center;
+  gap:4px;
 }
 
 /* zonas de drop */

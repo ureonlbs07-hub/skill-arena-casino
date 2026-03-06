@@ -6,6 +6,7 @@ const { Server } = require('socket.io')
 const cors = require('cors')
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 
 const db = require('./src/config/database')
 const gameService = require('./src/modules/game/game.service')
@@ -32,6 +33,7 @@ const io = new Server(server, {
 let rooms = {}
 let users = {}
 let socketToRoom = {}
+let adminTokens = {}
 
 // ============================================
 // ✅ ROTAS DA API
@@ -40,6 +42,7 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/game', gameRoutes)
 app.use('/api/admin', adminRoutes)
 
+// ✅ Rota para verificar status da sala
 app.get('/api/room/status/:code', async (req, res) => {
   try {
     const { code } = req.params
@@ -55,37 +58,125 @@ app.get('/api/room/status/:code', async (req, res) => {
   }
 })
 
+// ✅ Rota para verificar se sala existe
 app.get('/api/room/:code', async (req, res) => {
   const room = rooms[req.params.code]
   if (!room) return res.json({ exists: false })
   res.json({ exists: true, players: (room.host ? 1 : 0) + (room.guest ? 1 : 0), started: room.started })
 })
 
-app.post('/api/confirm-payment', async (req, res) => {
+// ============================================
+// ✅ ROTAS DO ADMIN PANEL
+// ============================================
+app.post('/api/admin/login', async (req, res) => {
+  const { password } = req.body
+  if (password === 'admin123') {
+    const token = crypto.randomBytes(32).toString('hex')
+    adminTokens[token] = { loginTime: Date.now() }
+    res.json({ success: true, token })
+  } else {
+    res.json({ success: false, error: 'Senha inválida' })
+  }
+})
+
+app.get('/api/admin/data', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token || !adminTokens[token]) {
+    return res.status(401).json({ success: false, error: 'Não autorizado' })
+  }
   try {
-    const { transactionId, password } = req.body
-    if (password !== 'admin123') return res.status(401).json({ success: false, error: 'Não autorizado' })
-    
+    const settings = await adminService.getAllSettings()
+    const transactions = await db.query(`SELECT * FROM transactions ORDER BY created_at DESC LIMIT 50`)
+    const houseBalance = await db.query(`SELECT SUM(amount) as total FROM transactions WHERE type = 'house_fee'`)
+    res.json({ settings, transactions: transactions.rows, houseBalance: parseFloat(houseBalance.rows[0]?.total || 0), rooms: Object.values(rooms) })
+  } catch (error) {
+    console.error('Erro admin data:', error)
+    res.json({ settings: {}, transactions: [], houseBalance: 0, rooms: [] })
+  }
+})
+
+app.post('/api/admin/settings', async (req, res) => {
+  const { token, monetizationEnabled } = req.body
+  if (!token || !adminTokens[token]) {
+    return res.status(401).json({ success: false, error: 'Não autorizado' })
+  }
+  try {
+    await adminService.updateSetting('monetization_enabled', monetizationEnabled ? 'true' : 'false')
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Erro update settings:', error)
+    res.json({ success: false, error: error.message })
+  }
+})
+
+app.post('/api/admin/confirm-payment', async (req, res) => {
+  const { transactionId, token } = req.body
+  if (!token || !adminTokens[token]) {
+    return res.status(401).json({ success: false, error: 'Não autorizado' })
+  }
+  try {
     await paymentService.confirmPayment(transactionId)
-    
     const txResult = await db.query(`SELECT room_code, player_type FROM transactions WHERE id = $1`, [transactionId])
-    if (txResult.rows.length === 0) return res.json({ success: false, error: 'Transação não encontrada' })
-    
+    if (txResult.rows.length === 0) {
+      return res.json({ success: false, error: 'Transação não encontrada' })
+    }
     const roomCode = txResult.rows[0].room_code
     const playerType = txResult.rows[0].player_type
     const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
-    
     await db.query(`UPDATE rooms SET ${column} = TRUE WHERE code = $1`, [roomCode])
-    
     if (rooms[roomCode]) {
       rooms[roomCode][playerType === 'host' ? 'hostPaid' : 'guestPaid'] = true
     }
-    
     const room = rooms[roomCode]
     if (room && room.hostPaid && room.guestPaid && room.host) {
       io.to(room.host).emit('bothPaid', { roomId: roomCode })
     }
-    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Erro confirm payment:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.get('/api/payment/pending', async (req, res) => {
+  try {
+    const result = await db.query(`SELECT * FROM transactions WHERE status = 'pending' ORDER BY created_at DESC`)
+    res.json({ transactions: result.rows })
+  } catch (error) {
+    console.error('Erro pending payments:', error)
+    res.json({ transactions: [] })
+  }
+})
+
+app.post('/api/payment/cancel', async (req, res) => {
+  const { transactionId } = req.body
+  try {
+    await db.query(`UPDATE transactions SET status = 'cancelled' WHERE id = $1`, [transactionId])
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Erro cancel payment:', error)
+    res.json({ success: false, error: error.message })
+  }
+})
+
+app.post('/api/confirm-payment', async (req, res) => {
+  const { transactionId, password } = req.body
+  if (password !== 'admin123') return res.status(401).json({ success: false, error: 'Não autorizado' })
+  try {
+    await paymentService.confirmPayment(transactionId)
+    const txResult = await db.query(`SELECT room_code, player_type FROM transactions WHERE id = $1`, [transactionId])
+    if (txResult.rows.length === 0) return res.json({ success: false, error: 'Transação não encontrada' })
+    const roomCode = txResult.rows[0].room_code
+    const playerType = txResult.rows[0].player_type
+    const column = playerType === 'host' ? 'host_paid' : 'guest_paid'
+    await db.query(`UPDATE rooms SET ${column} = TRUE WHERE code = $1`, [roomCode])
+    if (rooms[roomCode]) {
+      rooms[roomCode][playerType === 'host' ? 'hostPaid' : 'guestPaid'] = true
+    }
+    const room = rooms[roomCode]
+    if (room && room.hostPaid && room.guestPaid && room.host) {
+      io.to(room.host).emit('bothPaid', { roomId: roomCode })
+    }
     res.json({ success: true })
   } catch (error) {
     console.error('Erro confirmar pagamento:', error)
@@ -93,10 +184,8 @@ app.post('/api/confirm-payment', async (req, res) => {
   }
 })
 
-// ✅ ROTA DO ADMIN
 app.get('/admin', (req, res) => {
   const adminPath = path.join(__dirname, 'public', 'admin.html')
-  console.log('📁 Admin path:', adminPath)
   res.sendFile(adminPath)
 })
 
@@ -137,7 +226,6 @@ io.on('connection', (socket) => {
     await db.query(`INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = $2`, [socket.id, username])
     users[socket.id] = { username }
     socket.emit('registered', { id: socket.id, username })
-    console.log('✅ Registrado:', socket.id, username)
   })
 
   socket.on('reconnect', (data) => {
@@ -201,8 +289,7 @@ io.on('connection', (socket) => {
     
     socketToRoom[socket.id] = code
     socket.join(code)
-    
-    console.log('👤 Guest entrou:', code, 'Socket:', socket.id)
+    console.log('👤 Guest entrou:', code)
 
     const settings = await adminService.getAllSettings()
     if (settings.monetization_enabled === 'true') {
@@ -219,8 +306,6 @@ io.on('connection', (socket) => {
 
   socket.on('startGame', async (code) => {
     const room = rooms[code]
-    console.log('🎮 startGame:', code, 'socket:', socket.id, 'room.host:', room?.host)
-    
     if (!room) return socket.emit('error', { message: 'Sala não encontrada' })
     if (room.host !== socket.id) return socket.emit('error', { message: 'Apenas host pode iniciar' })
     if (!room.guest) return socket.emit('error', { message: 'Aguarde o convidado' })
@@ -314,7 +399,6 @@ io.on('connection', (socket) => {
   })
 })
 
-// ✅ CORRIGIDO: Usa "r.guest" em vez de "room.guest"
 function sendRoomList() {
   const list = Object.values(rooms).map(r => ({ 
     code: r.code, 
